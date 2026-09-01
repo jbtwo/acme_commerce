@@ -1,0 +1,14 @@
+workspace:
+  id: f83637e2-5f47-444c-8f4e-bd1f3a681610
+localResources:
+  specs:
+    - ../openapi/openapi.json
+cloudResources:
+  collections:
+    ../postman/collections/Acme Commerce: 57347314-90cacb2a-c96b-46ed-b9a9-39a2883c5b2d
+  environments:
+    ../postman/environments/development.environment.yaml: 57347314-6382720d-9f4c-4c4e-912a-139d91658fcd
+  specs:
+    ../openapi/openapi.json: 017bb662-c4d4-484d-9089-9b1ec6929600
+  globals:
+    ../postman/globals/workspace.globals.yaml: e5540bf3-7782-4067-8e48-7935966ea540
