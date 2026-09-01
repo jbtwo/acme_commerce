@@ -195,8 +195,8 @@ request; when a response shape changes, update the tests that assert on it.
 Re-importing the OpenAPI document into Postman is a useful cross-check: it shows you what a
 _new_ consumer would see, which is not what you see, because you know what you meant.
 
-Strip secrets before committing an environment export. `postman/README.md` explains how, and
-why `git rm` afterwards does not help.
+Strip secrets before committing an environment export. `LEARNING_GUIDE.md` §7 explains the
+local-versus-shared value distinction, and why `git rm` afterwards does not help.
 
 ## 11. Open a pull request
 

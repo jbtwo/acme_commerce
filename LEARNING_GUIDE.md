@@ -669,16 +669,33 @@ whoever imports it gets a `404` they cannot explain.
 | Works locally, `404` on Unraid              | A path was hard-coded, or the deployment is on a different port                             |
 | A committed environment leaks a token       | Values were exported as _initial_ values instead of _current_ ones                          |
 
-### The initial-versus-current distinction
+### The local-versus-shared distinction
 
-The single most useful thing to know about Postman and secrets: an environment variable has an
-**initial value** and a **current value**. Postman **exports initial values** and leaves current
-values on your machine. So a secret set as a _current_ value does not travel into your export,
-and one set as an _initial_ value does — into your repository, and into every clone and fork,
-permanently, because `git rm` does not unpublish it.
+The single most useful thing to know about Postman and secrets. The terminology changed
+recently, so both names are worth carrying:
+
+| Postman app       | VS Code extension | Synced to cloud and git | Visible to Newman / Postman CLI / monitors |
+| ----------------- | ----------------- | ----------------------- | ------------------------------------------ |
+| **Value** (local) | Current value     | **No**                  | No                                         |
+| **Shared value**  | Initial value     | **Yes**                 | Yes                                        |
+
+In the Postman app there is now one **Value** column plus an explicit share action per row. The
+older two-column Initial/Current layout survives only in the VS Code extension.
+
+So a secret set as a **local value** does not travel into your export, and one set as a
+**shared value** does — into the Postman cloud, into your repository, and into every clone and
+fork, permanently, because `git rm` does not unpublish it.
+
+The corollary catches people out in the other direction too: an **unshared `base_url` syncs as
+an empty string**. The collection works perfectly for you and is a shell for everyone else,
+including CI. Configuration should be shared; credentials should not.
+
+That leaves a genuine tension, worth seeing now rather than discovering in Milestone 5: cloud
+runners can only read shared values, so a collection that needs a token in CI cannot simply keep
+it local. The resolution is not to share the token — it is to inject it at run time from a CI
+secret.
 
 Nothing in Milestone 1 needs a credential. The habit belongs in place before the secret does.
-[`postman/README.md`](postman/README.md) has the full checklist.
 
 ### Who cares
 

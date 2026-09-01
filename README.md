@@ -44,8 +44,7 @@ command-line smoke script.
 are built **by hand, by the learner**. Nothing in `postman/` is generated.
 
 The order is deliberate: the API is verified first, so that when a Postman request fails, "the
-API is broken" is a hypothesis to be ruled out rather than the assumed answer. See
-[`postman/README.md`](postman/README.md) for the full division of responsibility.
+API is broken" is a hypothesis to be ruled out rather than the assumed answer.
 
 Not intended to become a production business. **Do not expose it to the internet** — there is
 no authentication until Milestone 2.
@@ -586,9 +585,9 @@ Both were exercised locally. Neither has been run on an actual Unraid server —
 The Catalog API is built and independently verified. Evidence, exact commands, and observed
 output are in [`docs/BUILD_VERIFICATION.md`](docs/BUILD_VERIFICATION.md).
 
-**Next: you build your first Postman collection, by hand.** Nothing in `postman/` is generated —
-see [`postman/README.md`](postman/README.md) for why and for the naming and secret-handling
-conventions.
+**Next: you build your first Postman collection, by hand.** Nothing in `postman/` is generated.
+[`LEARNING_GUIDE.md`](LEARNING_GUIDE.md) §7 covers variable scopes and the local-versus-shared
+value distinction that keeps credentials out of the repository.
 
 What you need:
 
@@ -619,4 +618,3 @@ and committed, they have been reviewed, and continuation is explicitly authorise
 | [`docs/DEVELOPMENT_WORKFLOW.md`](docs/DEVELOPMENT_WORKFLOW.md) | The 17-step change lifecycle, and what each step catches           |
 | [`LEARNING_GUIDE.md`](LEARNING_GUIDE.md)                       | API engineering concepts as they appear here. Grows each milestone |
 | [`PERSONAS.md`](PERSONAS.md)                                   | Who participates, what they need, what frustrates them             |
-| [`postman/README.md`](postman/README.md)                       | Division of responsibility, naming, secret handling                |
