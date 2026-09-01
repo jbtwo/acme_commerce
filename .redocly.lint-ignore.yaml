@@ -1,0 +1,21 @@
+# Redocly lint exceptions — reviewed and accepted, not switched off.
+#
+# The `operation-4xx-response` rule is correct and stays as an error for every API operation.
+# It does not fit the three platform endpoints, which genuinely return no 4xx:
+#
+#   GET /health        200 only. It reports process state and contacts nothing that could
+#                      produce a client error.
+#   GET /ready         200 or 503. A failed dependency is a server-side condition, not a
+#                      client mistake, so 5xx is the correct class.
+#   GET /openapi.json  200 only. It takes no parameters, so there is nothing to get wrong.
+#
+# Recording the exceptions here rather than relaxing the rule keeps them located, dated by git
+# history, and visible in review. A rule turned off is a rule nobody re-examines; an exception
+# list is a thing a reviewer reads.
+#
+# Do not add to this file to silence a genuine gap in an API operation's documented responses.
+openapi/openapi.json:
+  operation-4xx-response:
+    - '#/paths/~1health/get/responses'
+    - '#/paths/~1openapi.json/get/responses'
+    - '#/paths/~1ready/get/responses'

@@ -1,0 +1,1882 @@
+{
+  "components": {
+    "schemas": {
+      "Error": {
+        "additionalProperties": false,
+        "description": "The single error shape returned by every Acme Commerce API error response.",
+        "example": {
+          "error": {
+            "code": "VALIDATION_ERROR",
+            "details": {
+              "fields": [
+                {
+                  "field": "body.title",
+                  "message": "\"title\" is required.",
+                  "rule": "required"
+                }
+              ]
+            },
+            "message": "The request body is invalid.",
+            "request_id": "req_18f3a9c4e21b7d05f6a3b8c1"
+          }
+        },
+        "properties": {
+          "error": {
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "description": "Stable machine-readable error code. Branch on this, never on `message`. The full list is documented in README.md.",
+                "example": "SKU_ALREADY_EXISTS",
+                "type": "string"
+              },
+              "details": {
+                "additionalProperties": true,
+                "description": "Optional structured context. Its shape depends on `code`: `VALIDATION_ERROR` carries a `fields` array, `MALFORMED_ID` carries `expected_pattern`, `SKU_ALREADY_EXISTS` carries the conflicting `sku`.",
+                "properties": {},
+                "type": "object"
+              },
+              "message": {
+                "description": "Human-readable explanation, for a log or a response pane. May be reworded in any release; it is not part of the contract.",
+                "type": "string"
+              },
+              "request_id": {
+                "description": "Correlation identifier for this request, also returned in the `X-Request-Id` response header. Quote it when reporting a problem — it is what locates the server-side log lines.",
+                "example": "req_18f3a9c4e21b7d05f6a3b8c1",
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "request_id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "Error",
+        "type": "object"
+      },
+      "HealthResponse": {
+        "additionalProperties": false,
+        "description": "Liveness. Answered from process state alone; no dependency is contacted.",
+        "properties": {
+          "environment": {
+            "description": "Configured APP_ENV: development, test, or production.",
+            "type": "string"
+          },
+          "service": {
+            "description": "Service name, for when several services share a log stream.",
+            "type": "string"
+          },
+          "status": {
+            "description": "Always \"ok\". If the process could not answer, you would get no response at all.",
+            "enum": [
+              "ok"
+            ],
+            "type": "string"
+          },
+          "uptime_seconds": {
+            "description": "Seconds since this process started. A resetting value means it is crash-looping.",
+            "type": "number"
+          },
+          "version": {
+            "description": "Deployed application version. Use it to confirm an image update took effect.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "version",
+          "environment",
+          "uptime_seconds"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      },
+      "Pagination": {
+        "additionalProperties": false,
+        "description": "Offset pagination metadata, present on every collection response.",
+        "properties": {
+          "limit": {
+            "description": "The page size that was applied.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "page": {
+            "description": "The page that was returned.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "total": {
+            "description": "Total records matching the filters, across all pages.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "total_pages": {
+            "description": "Number of pages at this `limit`. Zero when `total` is zero — not one empty page.",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "total_pages"
+        ],
+        "title": "Pagination",
+        "type": "object"
+      },
+      "Product": {
+        "additionalProperties": false,
+        "description": "A sellable item in the Acme Commerce catalog. A product carries merchandising information; the purchasable units with SKUs and prices are its variants.",
+        "properties": {
+          "archived_at": {
+            "description": "When the product was archived. Non-null exactly when `status` is `archived`.",
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "created_at": {
+            "description": "RFC 3339 timestamp of creation, in UTC. Immutable.",
+            "example": "2025-01-14T15:20:00.000Z",
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "description": "Long-form product description. Null when none has been written.",
+            "maxLength": 5000,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "id": {
+            "description": "Server-assigned product identifier. Always `prod_` followed by 24 lowercase hex characters. Assigned by the API; never constructed by a client.",
+            "example": "prod_7ebf51270d4d3de9f7acad4c",
+            "pattern": "^prod_[0-9a-f]{24}$",
+            "type": "string"
+          },
+          "product_type": {
+            "description": "Merchandising category, e.g. \"Backpacks\". Filterable via `product_type`.",
+            "maxLength": 100,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "description": "Publication state. `draft` is not customer-visible, `active` is for sale, `archived` is retired but retained so historical orders remain meaningful.",
+            "enum": [
+              "draft",
+              "active",
+              "archived"
+            ],
+            "type": "string"
+          },
+          "tags": {
+            "description": "Free-form labels used for merchandising. Filterable one at a time via `tag`. Always an array; an untagged product has `[]`, never null.",
+            "example": [
+              "outdoor",
+              "hiking",
+              "bestseller"
+            ],
+            "items": {
+              "maxLength": 50,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "type": "array"
+          },
+          "title": {
+            "description": "Customer-facing product name.",
+            "example": "Trailhead 30L Backpack",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "updated_at": {
+            "description": "RFC 3339 timestamp of the most recent change, in UTC. Maintained by a database trigger, so it cannot be left stale by application code that forgets to set it.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "vendor": {
+            "description": "Brand or supplier. Filterable via the `vendor` query parameter (case-insensitive exact match).",
+            "maxLength": 100,
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "description",
+          "status",
+          "vendor",
+          "product_type",
+          "tags",
+          "created_at",
+          "updated_at",
+          "archived_at"
+        ],
+        "title": "Product",
+        "type": "object"
+      },
+      "ProductCreate": {
+        "additionalProperties": false,
+        "description": "Body for creating a product. Unknown properties are REJECTED with 400 rather than ignored — a silently-dropped `titel` is a typo that ships to production believing it worked.",
+        "example": {
+          "description": "A 2.5-layer shell that stuffs into its own pocket.",
+          "product_type": "Apparel",
+          "status": "active",
+          "tags": [
+            "waterproof",
+            "lightweight"
+          ],
+          "title": "Riverbend Packable Rain Jacket",
+          "vendor": "Acme"
+        },
+        "properties": {
+          "description": {
+            "description": "Optional long-form description.",
+            "maxLength": 5000,
+            "type": "string"
+          },
+          "product_type": {
+            "description": "Optional merchandising category.",
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "status": {
+            "default": "draft",
+            "description": "Optional. Defaults to `draft`, so a new product is not accidentally live.",
+            "enum": [
+              "draft",
+              "active",
+              "archived"
+            ],
+            "type": "string"
+          },
+          "tags": {
+            "description": "Optional labels. Defaults to an empty array.",
+            "items": {
+              "maxLength": 50,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "type": "array"
+          },
+          "title": {
+            "description": "Required. Customer-facing product name.",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "vendor": {
+            "description": "Optional brand or supplier.",
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "ProductCreate",
+        "type": "object"
+      },
+      "ProductListResponse": {
+        "additionalProperties": false,
+        "description": "A page of products plus the pagination metadata needed to fetch the rest.",
+        "properties": {
+          "data": {
+            "description": "The requested page of products. Empty when nothing matches.",
+            "items": {
+              "$ref": "#/components/schemas/Product"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "title": "ProductListResponse",
+        "type": "object"
+      },
+      "ProductResponse": {
+        "additionalProperties": false,
+        "description": "A single product.",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Product"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ProductResponse",
+        "type": "object"
+      },
+      "ProductUpdate": {
+        "additionalProperties": false,
+        "description": "Partial update. Only the properties you send are changed. An omitted property is left alone; an explicit null clears a nullable property. Those are genuinely different operations, which is the whole reason PATCH exists rather than PUT. An empty body is rejected with 400 — it is far more often a client bug than a deliberate no-op.",
+        "example": {
+          "status": "active",
+          "tags": [
+            "outdoor",
+            "bestseller"
+          ]
+        },
+        "minProperties": 1,
+        "properties": {
+          "description": {
+            "description": "New description. Send null to clear it.",
+            "maxLength": 5000,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "product_type": {
+            "description": "New product type. Send null to clear it.",
+            "maxLength": 100,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "New publication state. Setting `archived` here is equivalent to calling DELETE; moving away from `archived` un-archives the product and clears `archived_at`.",
+            "enum": [
+              "draft",
+              "active",
+              "archived"
+            ],
+            "type": "string"
+          },
+          "tags": {
+            "description": "Replaces the entire tag array. This is not a merge; send the full list.",
+            "items": {
+              "maxLength": 50,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 50,
+            "type": "array"
+          },
+          "title": {
+            "description": "New product name.",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "vendor": {
+            "description": "New vendor. Send null to clear it.",
+            "maxLength": 100,
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "title": "ProductUpdate",
+        "type": "object"
+      },
+      "ReadinessResponse": {
+        "additionalProperties": false,
+        "description": "Readiness. Returns 200 when the application can serve API traffic and 503 when it cannot. The body shape is identical for both, so a client parses one thing.",
+        "properties": {
+          "checked_at": {
+            "description": "When these checks ran. Results are not cached.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "checks": {
+            "additionalProperties": false,
+            "description": "Per-dependency results, so a failure names itself.",
+            "properties": {
+              "configuration": {
+                "additionalProperties": false,
+                "properties": {
+                  "detail": {
+                    "description": "Human-readable explanation, useful when the check failed.",
+                    "type": "string"
+                  },
+                  "duration_ms": {
+                    "description": "How long this check took, in milliseconds.",
+                    "type": "number"
+                  },
+                  "status": {
+                    "description": "Whether this individual check passed.",
+                    "enum": [
+                      "ok",
+                      "fail"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "status",
+                  "detail",
+                  "duration_ms"
+                ],
+                "type": "object"
+              },
+              "database": {
+                "additionalProperties": false,
+                "properties": {
+                  "detail": {
+                    "description": "Human-readable explanation, useful when the check failed.",
+                    "type": "string"
+                  },
+                  "duration_ms": {
+                    "description": "How long this check took, in milliseconds.",
+                    "type": "number"
+                  },
+                  "status": {
+                    "description": "Whether this individual check passed.",
+                    "enum": [
+                      "ok",
+                      "fail"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "status",
+                  "detail",
+                  "duration_ms"
+                ],
+                "type": "object"
+              },
+              "migrations": {
+                "additionalProperties": false,
+                "properties": {
+                  "detail": {
+                    "description": "Human-readable explanation, useful when the check failed.",
+                    "type": "string"
+                  },
+                  "duration_ms": {
+                    "description": "How long this check took, in milliseconds.",
+                    "type": "number"
+                  },
+                  "status": {
+                    "description": "Whether this individual check passed.",
+                    "enum": [
+                      "ok",
+                      "fail"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "status",
+                  "detail",
+                  "duration_ms"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "configuration",
+              "database",
+              "migrations"
+            ],
+            "type": "object"
+          },
+          "status": {
+            "description": "Overall verdict. `not_ready` is returned with HTTP 503.",
+            "enum": [
+              "ready",
+              "not_ready"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "checks",
+          "checked_at"
+        ],
+        "title": "ReadinessResponse",
+        "type": "object"
+      },
+      "Variant": {
+        "additionalProperties": false,
+        "description": "A purchasable unit of a product: one SKU, one price. Inventory and orders reference variants, not products.",
+        "properties": {
+          "archived_at": {
+            "description": "When the variant was archived. Non-null exactly when `status` is `archived`.",
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "barcode": {
+            "description": "UPC, EAN, or ISBN. Null when unknown.",
+            "maxLength": 64,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "compare_at_price_cents": {
+            "description": "Reference \"was\" price in minor units, used to display a markdown. Null when the variant is not on sale. Not validated against `price_cents`.",
+            "minimum": 0,
+            "type": [
+              "null",
+              "integer"
+            ]
+          },
+          "created_at": {
+            "description": "RFC 3339 creation timestamp, UTC.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "currency": {
+            "description": "ISO 4217 currency code for `price_cents` and `compare_at_price_cents`.",
+            "example": "CAD",
+            "pattern": "^[A-Z]{3}$",
+            "type": "string"
+          },
+          "id": {
+            "description": "Server-assigned variant identifier.",
+            "example": "var_1a2b3c4d5e6f708192a3b4c5",
+            "pattern": "^var_[0-9a-f]{24}$",
+            "type": "string"
+          },
+          "inventory_item_id": {
+            "description": "Reference to the inventory item that tracks stock for this variant. Always null in Milestone 1 — the Inventory API that populates it arrives in Milestone 2. Present in the contract now so the seam is visible rather than pretended away.",
+            "maxLength": 64,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "position": {
+            "description": "Display order within the product. `GET /products/{id}/variants` returns variants sorted by this value, then by `id` to break ties.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "price_cents": {
+            "description": "Price in the smallest unit of `currency` — 12900 means CAD 129.00. An integer, never a decimal: IEEE-754 floats cannot represent 0.10 exactly, and money arithmetic in floats produces off-by-a-cent errors that survive most test suites.",
+            "example": 12900,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "product_id": {
+            "description": "Identifier of the product this variant belongs to.",
+            "pattern": "^prod_[0-9a-f]{24}$",
+            "type": "string"
+          },
+          "sku": {
+            "description": "Stock-keeping unit. Unique across the ENTIRE catalog, not merely within one product. Creating a variant with a SKU that already exists returns 409.",
+            "example": "ACME-BAG-BLK",
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "status": {
+            "description": "Variant state. Variants have no `draft`: publication is a product-level concept, so a variant of a draft product is `active` and simply not reachable by customers.",
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "description": "Variant name, typically the option combination.",
+            "example": "Black",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          },
+          "updated_at": {
+            "description": "RFC 3339 last-modified timestamp, UTC.",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "product_id",
+          "sku",
+          "title",
+          "price_cents",
+          "compare_at_price_cents",
+          "currency",
+          "barcode",
+          "inventory_item_id",
+          "status",
+          "position",
+          "created_at",
+          "updated_at",
+          "archived_at"
+        ],
+        "title": "Variant",
+        "type": "object"
+      },
+      "VariantCreate": {
+        "additionalProperties": false,
+        "description": "Body for creating a variant. The parent product is taken from the URL path, not the body, so the two cannot disagree.",
+        "example": {
+          "compare_at_price_cents": 22900,
+          "currency": "CAD",
+          "price_cents": 18900,
+          "sku": "ACME-RAIN-BLK-M",
+          "title": "Black / Medium"
+        },
+        "properties": {
+          "barcode": {
+            "description": "Optional UPC/EAN.",
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "compare_at_price_cents": {
+            "description": "Optional reference price in minor units.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "currency": {
+            "default": "CAD",
+            "description": "Optional ISO 4217 code. Defaults to CAD.",
+            "pattern": "^[A-Z]{3}$",
+            "type": "string"
+          },
+          "position": {
+            "description": "Optional display order. Defaults to one past the current highest position.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "price_cents": {
+            "description": "Required. Price in minor units. Must be a non-negative integer.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "sku": {
+            "description": "Required. Must be unique across the entire catalog.",
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": {
+            "description": "Required. Variant name.",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "sku",
+          "title",
+          "price_cents"
+        ],
+        "title": "VariantCreate",
+        "type": "object"
+      },
+      "VariantListResponse": {
+        "additionalProperties": false,
+        "description": "Every variant belonging to one product, unpaginated.",
+        "properties": {
+          "data": {
+            "description": "All variants of the product, ordered by `position` then `id`. This sub-collection is not paginated: a product has tens of variants, not thousands. The response is capped at 250.",
+            "items": {
+              "$ref": "#/components/schemas/Variant"
+            },
+            "maxItems": 250,
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "VariantListResponse",
+        "type": "object"
+      },
+      "VariantResponse": {
+        "additionalProperties": false,
+        "description": "A single variant.",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Variant"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "VariantResponse",
+        "type": "object"
+      },
+      "VariantUpdate": {
+        "additionalProperties": false,
+        "description": "Partial update of a variant. Same omitted-versus-null semantics as ProductUpdate.",
+        "example": {
+          "compare_at_price_cents": null,
+          "price_cents": 11900
+        },
+        "minProperties": 1,
+        "properties": {
+          "barcode": {
+            "description": "New barcode. Send null to clear it.",
+            "maxLength": 64,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "compare_at_price_cents": {
+            "description": "New reference price. Send null to remove the markdown.",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "currency": {
+            "description": "New ISO 4217 currency code.",
+            "pattern": "^[A-Z]{3}$",
+            "type": "string"
+          },
+          "position": {
+            "description": "New display order.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "price_cents": {
+            "description": "New price in minor units.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "sku": {
+            "description": "New SKU. Still subject to global uniqueness.",
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "status": {
+            "description": "New variant state. `archived` is equivalent to DELETE.",
+            "enum": [
+              "active",
+              "archived"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "description": "New variant name.",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "title": "VariantUpdate",
+        "type": "object"
+      }
+    }
+  },
+  "externalDocs": {
+    "description": "Repository README, architecture notes, and the learning guide.",
+    "url": "https://github.com/jbtwo/acme_commerce#readme"
+  },
+  "info": {
+    "contact": {
+      "email": "platform@acme.example",
+      "name": "Acme Commerce Platform Team"
+    },
+    "description": "Acme Commerce is a fictional ecommerce platform whose APIs are the product. This document\ndescribes the internal API used by first-party applications.\n\n## Conventions\n\n**Envelopes.** A single resource is `{ \"data\": { ... } }`. A paginated collection is\n`{ \"data\": [ ... ], \"pagination\": { ... } }`. Every error is\n`{ \"error\": { \"code\", \"message\", \"request_id\", \"details\"? } }`. Wrapping leaves room to add\nmetadata later without breaking existing clients.\n\nThe platform endpoints `/health`, `/ready`, and `/openapi.json` sit outside that envelope\nand outside the version prefix, deliberately: they describe the process, not the product, and\na container probe should not have to track API versions.\n\n**Field naming.** `snake_case` in JSON, everywhere, in both directions.\n\n**Money.** Integer minor units with a separate currency — `price_cents: 12900` with\n`currency: \"CAD\"` means CAD 129.00. Never a float: IEEE-754 cannot represent 0.10 exactly,\nand money arithmetic in floats produces off-by-a-cent errors that survive most test suites.\n\n**Timestamps.** RFC 3339 in UTC, always with an explicit offset.\n\n**Identifiers.** Prefixed and opaque: `prod_` or `var_` followed by 24 lowercase hex\ncharacters. Assigned by the server; never constructed by a client. A syntactically invalid id\nreturns `400 MALFORMED_ID`, while a well-formed id naming nothing returns `404` — so a\nbroken string interpolation is distinguishable from a deleted record.\n\n## Correlation\n\nSend `X-Request-Id` to correlate a request with your own systems, or omit it and the server\ngenerates one. Either way the value comes back in the `X-Request-Id` **response header** on\nevery response, success or failure, and appears in `error.request_id`. It is on every server\nlog line for that request. When something goes wrong, that string is what makes the server-side\nstory findable.\n\n## Pagination\n\nOffset-based: `page` (default 1) and `limit` (default 25, maximum 100). An out-of-range\n`limit` is rejected with `400` rather than silently clamped. An empty result set is `200`\nwith `\"data\": []`, never `404`. `total_pages` is `0` when `total` is `0`.\n\nEvery sort appends `id` as a tiebreaker, so paging through a sorted list cannot show the same\nrecord twice or skip one.\n\n## Strictness\n\nUnknown properties in a request body, and unknown query parameters, are **rejected with 400**\nrather than ignored. Most public APIs ignore them. This one does not, because\n`?statuss=active` quietly returning every product is a worse outcome than a loud error that\nnames the unrecognised parameter.\n\n## Errors\n\nBranch on `error.code`, never on `error.message` — the code is the contract and the message\nis prose that may be reworded at any time. `error.details` carries structured context whose\nshape depends on the code.\n\n## Authentication\n\n**None in Milestone 1.** Every endpoint here is open. Bearer tokens and roles arrive in\nMilestone 2, and partner API keys in Milestone 4. This is a learning environment; do not\ndeploy it anywhere it can be reached from the internet.",
+    "license": {
+      "identifier": "MIT",
+      "name": "MIT"
+    },
+    "summary": "Internal ecommerce platform API for catalog, inventory, orders, and fulfillment.",
+    "title": "Acme Commerce API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/products": {
+      "get": {
+        "description": "Returns a page of products with pagination metadata.\n\n**No implicit filtering.** With no `status` parameter, products of every status are\nreturned, archived ones included. This API applies no hidden default filter: the result\nset is fully determined by the query string. Most catalog APIs hide archived records;\nthis one does not, so that DELETE is observable as a state change rather than as a\ndisappearance.\n\nFilters combine with AND. An empty result is `200` with `\"data\": []`, never `404` —\nan empty collection is a successful answer to a well-formed question. A page past the\nend is also `200` with an empty array.\n\n**Unknown query parameters are rejected with 400**, not ignored. `?statuss=active`\nsilently returning every product is a worse outcome than a loud error.\n\nOrdering always ends with `id` as a tiebreaker, so paging through a sorted list cannot\nshow the same record twice.\n\nEvery response carries an `X-Request-Id` header.",
+        "operationId": "listProducts",
+        "parameters": [
+          {
+            "description": "One-based page number. Requesting a page past the end returns an empty `data` array with 200, not 404.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Records per page. Default 25, maximum 100. A larger value is rejected with 400 rather than silently clamped, so a client asking for 1000 learns that it cannot have 1000.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filter by publication state. NOTE: with no `status` filter, products of ALL statuses are returned, archived included. This API applies no hidden default filter — the result set is fully determined by the query string.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "enum": [
+                "draft",
+                "active",
+                "archived"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by vendor. Case-insensitive EXACT match, not a prefix or substring.",
+            "example": "Acme",
+            "in": "query",
+            "name": "vendor",
+            "required": false,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by product type. Case-insensitive exact match.",
+            "example": "Backpacks",
+            "in": "query",
+            "name": "product_type",
+            "required": false,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter to products carrying this tag. Case-sensitive exact match on an array element. One tag per request in this version.",
+            "example": "bestseller",
+            "in": "query",
+            "name": "tag",
+            "required": false,
+            "schema": {
+              "maxLength": 50,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Case-insensitive substring search across `title`, `description`, and `vendor`. Does not search variant SKUs. Combines with the filters using AND.",
+            "example": "backpack",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Field to sort by. Restricted to this allowlist; any other value returns 400 with the permitted values in `error.details.allowed`. `id` is always appended as a tiebreaker so paging is stable across requests.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "created_at",
+              "enum": [
+                "created_at",
+                "updated_at",
+                "title",
+                "vendor",
+                "product_type",
+                "status"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Sort direction. Applies to the tiebreaker too.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed back in the X-Request-Id response header and included in structured errors. When absent or not matching this pattern, the server generates one. Supplying your own lets you correlate a request across your system and ours.",
+            "example": "my-app-checkout-attempt-42",
+            "in": "header",
+            "name": "x-request-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductListResponse"
+                }
+              }
+            },
+            "description": "A page of products."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An unexpected server error. `error.request_id` identifies the failure in the server logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The database is unreachable. Safe to retry; see the Retry-After header."
+          }
+        },
+        "summary": "List products",
+        "tags": [
+          "Catalog"
+        ]
+      },
+      "post": {
+        "description": "Creates a product. The identifier, timestamps, and archive state are assigned by the\nserver and cannot be supplied.\n\nA new product defaults to `draft` status so that creating one does not accidentally\npublish it.\n\nUnknown body properties are rejected with `400` rather than ignored, so a misspelled\nfield is visible immediately instead of shipping to production believing it worked.\n\nResponds `201` with a `Location` header pointing at the new product.",
+        "operationId": "createProduct",
+        "parameters": [
+          {
+            "description": "Optional caller-supplied correlation id, echoed back in the X-Request-Id response header and included in structured errors. When absent or not matching this pattern, the server generates one. Supplying your own lets you correlate a request across your system and ours.",
+            "example": "my-app-checkout-attempt-42",
+            "in": "header",
+            "name": "x-request-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
+                }
+              }
+            },
+            "description": "The product that was created."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An unexpected server error. `error.request_id` identifies the failure in the server logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The database is unreachable. Safe to retry; see the Retry-After header."
+          }
+        },
+        "summary": "Create a product",
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/api/v1/products/{productId}": {
+      "delete": {
+        "description": "**Archives the product; it is not destroyed.** Status becomes `archived`,\n`archived_at` is set, and all of its variants are archived with it.\n\nCatalog records are referenced by historical orders. Hard-deleting a variant that a\ntwo-year-old order points at destroys that order's meaning, so retiring a product\nis a state change rather than a deletion. Archived products remain retrievable and\nstill appear in `GET /products` unless you filter them out.\n\nResponds `200` with the archived product rather than `204 No Content`, so the state\ntransition is visible in the response you are already looking at.\n\n**Idempotent.** Archiving an already-archived product returns `200` again, not a\nconflict — repeating a delete after a network timeout is not an error.",
+        "operationId": "archiveProduct",
+        "parameters": [
+          {
+            "description": "Product identifier as returned by the API.",
+            "example": "prod_7ebf51270d4d3de9f7acad4c",
+            "in": "path",
+            "name": "productId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed back in the X-Request-Id response header and included in structured errors. When absent or not matching this pattern, the server generates one. Supplying your own lets you correlate a request across your system and ours.",
+            "example": "my-app-checkout-attempt-42",
+            "in": "header",
+            "name": "x-request-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
+                }
+              }
+            },
+            "description": "The archived product. Returned for a repeat call too."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No product exists with that identifier (`PRODUCT_NOT_FOUND`)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An unexpected server error. `error.request_id` identifies the failure in the server logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The database is unreachable. Safe to retry; see the Retry-After header."
+          }
+        },
+        "summary": "Archive a product",
+        "tags": [
+          "Catalog"
+        ]
+      },
+      "get": {
+        "description": "Returns one product by identifier.\n\nTwo different failures are deliberately distinguished. A syntactically invalid id\nsuch as `prod_undefined` returns `400 MALFORMED_ID`, because that is a client bug.\nA well-formed id that names nothing returns `404 PRODUCT_NOT_FOUND`. Collapsing both\ninto 404 — as many APIs do — leaves the caller unable to tell a broken string\ninterpolation from a deleted record.",
+        "operationId": "getProduct",
+        "parameters": [
+          {
+            "description": "Product identifier as returned by the API.",
+            "example": "prod_7ebf51270d4d3de9f7acad4c",
+            "in": "path",
+            "name": "productId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed back in the X-Request-Id response header and included in structured errors. When absent or not matching this pattern, the server generates one. Supplying your own lets you correlate a request across your system and ours.",
+            "example": "my-app-checkout-attempt-42",
+            "in": "header",
+            "name": "x-request-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
+                }
+              }
+            },
+            "description": "The requested product."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No product exists with that identifier (`PRODUCT_NOT_FOUND`)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An unexpected server error. `error.request_id` identifies the failure in the server logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The database is unreachable. Safe to retry; see the Retry-After header."
+          }
+        },
+        "summary": "Retrieve a product",
+        "tags": [
+          "Catalog"
+        ]
+      },
+      "patch": {
+        "description": "Updates only the properties present in the body.\n\nOmitting a property leaves it unchanged; sending an explicit `null` clears a\nnullable property. Those are different operations, and being able to express both\nis the reason this is PATCH rather than PUT.\n\n`tags` is replaced wholesale, not merged — send the complete list you want.\n\nAn empty body returns `400`: it is far more often a client bug than a deliberate\nno-op. Setting `status` to `archived` here is equivalent to calling DELETE, and\nmoving it away from `archived` un-archives the product and its variants.",
+        "operationId": "updateProduct",
+        "parameters": [
+          {
+            "description": "Product identifier as returned by the API.",
+            "example": "prod_7ebf51270d4d3de9f7acad4c",
+            "in": "path",
+            "name": "productId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed back in the X-Request-Id response header and included in structured errors. When absent or not matching this pattern, the server generates one. Supplying your own lets you correlate a request across your system and ours.",
+            "example": "my-app-checkout-attempt-42",
+            "in": "header",
+            "name": "x-request-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponse"
+                }
+              }
+            },
+            "description": "The product after the update."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No product exists with that identifier (`PRODUCT_NOT_FOUND`)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An unexpected server error. `error.request_id` identifies the failure in the server logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The database is unreachable. Safe to retry; see the Retry-After header."
+          }
+        },
+        "summary": "Partially update a product",
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/api/v1/products/{productId}/variants": {
+      "get": {
+        "description": "Returns every variant of the product, ordered by `position` then `id`.\n\nDeliberately **not paginated**: a product has tens of variants, not thousands, and\nforcing a caller to page through a size run would be pointless ceremony. The\nresponse is capped at 250 variants, which is documented rather than assumed.\n\nBecause it is not a paginated collection, the response has no `pagination` object —\nthe one place in this API where a collection differs in shape, and it is called out\nhere so that a governance review can confirm the reason rather than flag an\ninconsistency.\n\nAn unknown product returns `404`, not an empty list: \"this product has no variants\"\nand \"this product does not exist\" are different facts.",
+        "operationId": "listProductVariants",
+        "parameters": [
+          {
+            "description": "Product identifier as returned by the API.",
+            "example": "prod_7ebf51270d4d3de9f7acad4c",
+            "in": "path",
+            "name": "productId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed back in the X-Request-Id response header and included in structured errors. When absent or not matching this pattern, the server generates one. Supplying your own lets you correlate a request across your system and ours.",
+            "example": "my-app-checkout-attempt-42",
+            "in": "header",
+            "name": "x-request-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VariantListResponse"
+                }
+              }
+            },
+            "description": "Every variant of the product."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No product exists with that identifier (`PRODUCT_NOT_FOUND`)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An unexpected server error. `error.request_id` identifies the failure in the server logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The database is unreachable. Safe to retry; see the Retry-After header."
+          }
+        },
+        "summary": "List a product's variants",
+        "tags": [
+          "Catalog"
+        ]
+      },
+      "post": {
+        "description": "Adds a variant to the product named in the path. The parent is taken from the URL,\nnot the body, so the two cannot disagree.\n\n`sku` must be unique across the ENTIRE catalog, not merely within this product. A\nduplicate returns `409 SKU_ALREADY_EXISTS` with the conflicting variant id in\n`error.details`. Uniqueness is enforced by a database constraint rather than by a\nlookup before insert, because two concurrent requests can both pass a lookup.\n\n`position` defaults to one past the current highest.\n\nResponds `201` with a `Location` header.",
+        "operationId": "createVariant",
+        "parameters": [
+          {
+            "description": "Product identifier as returned by the API.",
+            "example": "prod_7ebf51270d4d3de9f7acad4c",
+            "in": "path",
+            "name": "productId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed back in the X-Request-Id response header and included in structured errors. When absent or not matching this pattern, the server generates one. Supplying your own lets you correlate a request across your system and ours.",
+            "example": "my-app-checkout-attempt-42",
+            "in": "header",
+            "name": "x-request-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VariantCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VariantResponse"
+                }
+              }
+            },
+            "description": "The variant that was created."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No product exists with that identifier (`PRODUCT_NOT_FOUND`)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "A variant with that SKU already exists (`SKU_ALREADY_EXISTS`)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An unexpected server error. `error.request_id` identifies the failure in the server logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The database is unreachable. Safe to retry; see the Retry-After header."
+          }
+        },
+        "summary": "Create a variant",
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/api/v1/variants/{variantId}": {
+      "delete": {
+        "description": "Archives the variant; it is not destroyed. Same rationale and same idempotency as archiving a product: historical orders reference variants, so retiring one is a state change. Responds `200` with the archived variant, including on a repeat call.",
+        "operationId": "archiveVariant",
+        "parameters": [
+          {
+            "description": "Variant identifier as returned by the API.",
+            "example": "var_1a2b3c4d5e6f708192a3b4c5",
+            "in": "path",
+            "name": "variantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed back in the X-Request-Id response header and included in structured errors. When absent or not matching this pattern, the server generates one. Supplying your own lets you correlate a request across your system and ours.",
+            "example": "my-app-checkout-attempt-42",
+            "in": "header",
+            "name": "x-request-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VariantResponse"
+                }
+              }
+            },
+            "description": "The archived variant. Returned for a repeat call too."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No variant exists with that identifier (`VARIANT_NOT_FOUND`)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An unexpected server error. `error.request_id` identifies the failure in the server logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The database is unreachable. Safe to retry; see the Retry-After header."
+          }
+        },
+        "summary": "Archive a variant",
+        "tags": [
+          "Catalog"
+        ]
+      },
+      "get": {
+        "description": "Returns one variant by identifier. Variants are addressable directly, without going through their product, because inventory and orders reference variants rather than products.",
+        "operationId": "getVariant",
+        "parameters": [
+          {
+            "description": "Variant identifier as returned by the API.",
+            "example": "var_1a2b3c4d5e6f708192a3b4c5",
+            "in": "path",
+            "name": "variantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed back in the X-Request-Id response header and included in structured errors. When absent or not matching this pattern, the server generates one. Supplying your own lets you correlate a request across your system and ours.",
+            "example": "my-app-checkout-attempt-42",
+            "in": "header",
+            "name": "x-request-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VariantResponse"
+                }
+              }
+            },
+            "description": "The requested variant."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No variant exists with that identifier (`VARIANT_NOT_FOUND`)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An unexpected server error. `error.request_id` identifies the failure in the server logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The database is unreachable. Safe to retry; see the Retry-After header."
+          }
+        },
+        "summary": "Retrieve a variant",
+        "tags": [
+          "Catalog"
+        ]
+      },
+      "patch": {
+        "description": "Updates only the properties present in the body, with the same omitted-versus-null semantics as updating a product. Changing `sku` is permitted and remains subject to global uniqueness, so it can return `409`.",
+        "operationId": "updateVariant",
+        "parameters": [
+          {
+            "description": "Variant identifier as returned by the API.",
+            "example": "var_1a2b3c4d5e6f708192a3b4c5",
+            "in": "path",
+            "name": "variantId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Optional caller-supplied correlation id, echoed back in the X-Request-Id response header and included in structured errors. When absent or not matching this pattern, the server generates one. Supplying your own lets you correlate a request across your system and ours.",
+            "example": "my-app-checkout-attempt-42",
+            "in": "header",
+            "name": "x-request-id",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Za-z0-9_-]{1,128}$",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VariantUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VariantResponse"
+                }
+              }
+            },
+            "description": "The variant after the update."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No variant exists with that identifier (`VARIANT_NOT_FOUND`)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Another variant already uses that SKU (`SKU_ALREADY_EXISTS`)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An unexpected server error. `error.request_id` identifies the failure in the server logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The database is unreachable. Safe to retry; see the Retry-After header."
+          }
+        },
+        "summary": "Partially update a variant",
+        "tags": [
+          "Catalog"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "description": "Reports that the process is running and able to answer HTTP. **It does not contact\nPostgreSQL**, and it does not fail when the database is down.\n\nThat is the whole distinction between liveness and readiness, and getting it wrong\nis a classic outage amplifier: if a liveness probe fails during a database blip, the\norchestrator restarts every application container, and now you have a database\noutage plus a thundering herd of cold starts. Liveness answers \"should this process\nbe killed and replaced?\" — a database outage is not a reason to kill this process.\n\nUse this for a Docker HEALTHCHECK. Use `/ready` to decide whether to send traffic.",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "The process is alive."
+          }
+        },
+        "summary": "Liveness probe",
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "description": "Returns the OpenAPI 3.1 document describing this API.\n\nIt is generated from the same JSON Schema objects that validate incoming requests and\nserialize outgoing responses, so it cannot describe a request shape the server would\nreject or a response field the server would strip.\n\nWhat that guarantee does NOT cover: whether a `description` is accurate, whether an\n`example` is current, or whether an operation is missing entirely. Those need review\nand linting, not generation.\n\nImport this URL into Postman to generate a collection skeleton.",
+        "operationId": "getOpenApiDocument",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The OpenAPI 3.1 document."
+          }
+        },
+        "summary": "Machine-readable API contract",
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/ready": {
+      "get": {
+        "description": "Reports whether the application can serve API traffic right now. Three checks:\n\n1. **configuration** — required settings were present and valid at startup. This one\n   cannot realistically fail here, because invalid configuration prevents the process\n   from starting at all. It is reported so the probe output is a complete picture.\n2. **database** — a live round trip to PostgreSQL. Catches a wrong host, a wrong\n   password, a firewall, and a stopped database container.\n3. **migrations** — whether every migration on disk has been applied. A container\n   running new code against an old schema is a specific, common, and confusing\n   failure; it is worth its own check.\n\nReturns `200` when all three pass and `503` when any fails, with the same body shape\neither way. Each check reports its own duration, so \"the database is slow\" and \"the\ndatabase is unreachable\" look different.\n\nOutside production the body also names the database being checked, with the password\nremoved — that is usually the fastest way to discover a container is pointed at the\nwrong host.",
+        "operationId": "getReadiness",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            },
+            "description": "Every check passed; the application can serve traffic."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            },
+            "description": "At least one check failed. Inspect `checks` to see which."
+          }
+        },
+        "summary": "Readiness probe",
+        "tags": [
+          "Platform"
+        ]
+      }
+    }
+  },
+  "servers": [
+    {
+      "description": "The server this document was fetched from.",
+      "url": "/"
+    }
+  ],
+  "tags": [
+    {
+      "description": "Liveness, readiness, and the machine-readable contract. Outside the version prefix and outside the response envelope, on purpose.",
+      "name": "Platform"
+    },
+    {
+      "description": "Products and their variants. A product carries merchandising information; a variant is a purchasable unit with a SKU and a price. Inventory and orders reference variants, not products.",
+      "name": "Catalog"
+    }
+  ]
+}

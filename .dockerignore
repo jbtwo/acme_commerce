@@ -1,0 +1,16 @@
+node_modules
+dist
+coverage
+test-results
+.git
+.github
+.env
+.env.*
+!.env.example
+tests
+docs
+postman
+scripts/dev-postgres.sh
+*.md
+!README.md
+.DS_Store

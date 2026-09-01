@@ -1,0 +1,48 @@
+# Governance rules applied to the generated OpenAPI document by `npm run openapi:lint`.
+#
+# These are intentionally stricter than "is it valid JSON Schema". A spec can be perfectly
+# valid and still be useless to a consumer: no descriptions, no examples, no operationIds.
+# Those are the defects this configuration is here to catch.
+#
+# Milestone 5 extends this file with the API-governance exercise.
+extends:
+  - recommended
+
+rules:
+  # Every operation must be identifiable, describable, and grouped.
+  operation-operationId: error
+  operation-operationId-unique: error
+  operation-summary: error
+  operation-description: error
+  # Every operation's tags must be declared in the top-level `tags` list, so the navigation a
+  # documentation tool builds is complete rather than accidental.
+  operation-tag-defined: error
+  tags-alphabetical: off
+
+  # A parameter without a description is a parameter the consumer has to guess at.
+  parameter-description: error
+
+  # Responses must be declared, including the error ones. Three platform operations
+  # legitimately return no 4xx at all; rather than switch this rule off, those specific
+  # locations are recorded in .redocly.lint-ignore.yaml where a reviewer can see them.
+  operation-4xx-response: error
+  operation-2xx-response: error
+
+  # Naming consistency. This API uses snake_case in JSON, everywhere, on purpose.
+  # (Redocly has no built-in snake_case property rule; enforced by review + tests instead.)
+  path-segment-plural: off
+  no-ambiguous-paths: error
+  path-declaration-must-exist: error
+  no-identical-paths: error
+
+  # Security schemes appear in Milestone 2; until then an operation with no security is correct.
+  security-defined: off
+
+  # Servers and info hygiene.
+  info-contact: off
+  info-license: off
+  no-server-example.com: error
+  no-empty-servers: error
+
+  # Examples are a deliverable, not a nicety — Postman surfaces them on import.
+  no-invalid-media-type-examples: error
