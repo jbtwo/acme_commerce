@@ -139,40 +139,143 @@ explicitly. Use the LAN IP.
 
 ## 3. Get the image onto Unraid
 
-Three options, in increasing order of ceremony.
+### 3.1 Option A — Docker Hub automated build (recommended)
 
-**(a) Build on the Unraid host.** Simplest if you have the repository there.
+Point Docker Hub at your GitHub repository and let it build. The `Dockerfile` is at the
+repository root, which is where Docker Hub's default build context expects it, so there is
+nothing to configure beyond linking the two.
+
+On Docker Hub: **Repository → Builds → Link to GitHub**, choose `jbtwo/acme_commerce`, and add a
+build rule. A reasonable starting pair:
+
+| Source type | Source      | Docker tag | Dockerfile location |
+| ----------- | ----------- | ---------- | ------------------- |
+| Branch      | `main`      | `edge`     | `/Dockerfile`       |
+| Tag         | `/^v(.*)$/` | `{\1}`     | `/Dockerfile`       |
+
+The second rule means `git tag v0.1.0 && git push --tags` publishes `:0.1.0`. That keeps the
+image tag, the git tag, and the `version` reported by `GET /health` all agreeing, which is what
+makes "which build is running?" answerable.
+
+Three things this buys you over building locally:
+
+- **Architecture is handled.** Docker Hub builds on `linux/amd64`, which is what your Unraid box
+  almost certainly needs. See §3.2 for why that matters if you ever build locally instead.
+- **It builds from a clean checkout**, so a build that depends on something only present on your
+  laptop fails on Docker Hub rather than silently working for you and nobody else.
+- **It is reproducible.** `npm ci` installs exactly what `package-lock.json` specifies.
+
+**Verified:** a clean `git clone` of this repository, with no `.env` and no `node_modules`, built
+for `linux/amd64` with `--no-cache`, produces an image that starts, connects to PostgreSQL, and
+returns `200` from both `/health` and `/ready`.
+
+Then on Unraid, set **Repository** to `REPLACE_DOCKERHUB_USER/acme-commerce:0.1.0`.
+
+**Public or private?** The image contains **no credentials** — verified: no `.env` file, no
+`.dev-postgres.env`, and the only baked-in environment variables are the seven non-secret
+defaults (`APP_ENV`, `HOST`, `PORT`, `LOG_LEVEL`, `LOG_PRETTY`, `NODE_ENV`,
+`MIGRATE_ON_STARTUP`). All configuration arrives at runtime. A public repository therefore leaks
+nothing your public GitHub repository does not already.
+
+The thing to keep private is not the image, it is **the deployment**: there is no authentication
+in Milestone 1, so anyone who can reach port 3000 can delete your catalog. See §13.
+
+Re-check that claim whenever the `Dockerfile` changes, rather than trusting this paragraph:
 
 ```bash
-cd /mnt/user/appdata/acme_commerce   # or wherever you cloned it
+docker run --rm --entrypoint sh REPLACE_DOCKERHUB_USER/acme-commerce:0.1.0 -c \
+  'find / -name ".env*" -not -path "*/node_modules/*" 2>/dev/null; ls -a /app; env'
+```
+
+### 3.2 If you build locally instead: check the architecture first
+
+Only relevant when _you_ run `docker build` rather than Docker Hub. Docker builds for the
+architecture of the machine doing the building, and an Apple Silicon Mac produces `linux/arm64`.
+
+On the Unraid terminal:
+
+```bash
+uname -m
+```
+
+- `x86_64` → you need **`linux/amd64`**. This is almost every Unraid box.
+- `aarch64` → you need **`linux/arm64`**.
+
+Pull an `arm64` image on an `x86_64` host and you get:
+
+```
+exec /usr/local/bin/node: exec format error
+```
+
+The container appears to start, dies immediately, and the single log line does not point at the
+cause. It is the most common way a first hand-built deployment fails from a Mac.
+
+Check what you have, and build for what you need:
+
+```bash
+docker image inspect acme-commerce:0.1.0 --format '{{.Os}}/{{.Architecture}}'
+
+docker buildx build --platform linux/amd64 -t acme-commerce:0.1.0 --load .
+```
+
+To publish one tag that serves the right binary to whatever pulls it, list both platforms.
+Multi-platform builds **must** use `--push`; the local daemon cannot hold a multi-arch manifest,
+so `--load` fails:
+
+```bash
+docker buildx build --platform linux/amd64,linux/arm64 \
+  -t REPLACE_DOCKERHUB_USER/acme-commerce:0.1.0 --push .
+
+docker buildx imagetools inspect REPLACE_DOCKERHUB_USER/acme-commerce:0.1.0
+```
+
+That last command prints every platform in the manifest. If `linux/amd64` is absent, Unraid will
+not run it.
+
+Cross-architecture builds run under emulation. For this project that costs seconds rather than
+minutes, because no dependency needs native compilation — which is part of why the stack was
+chosen that way.
+
+### 3.3 Option B — GitHub Container Registry
+
+The same commands with a different host. Worth preferring if you would rather keep image
+distribution next to the source, and it is what CI will use in Milestone 5:
+
+```bash
+echo $GITHUB_TOKEN | docker login ghcr.io -u REPLACE_GITHUB_USER --password-stdin
+docker buildx build --platform linux/amd64 \
+  -t ghcr.io/REPLACE_GITHUB_USER/acme-commerce:0.1.0 --push .
+```
+
+### 3.4 Option C — build on the Unraid host
+
+No registry, and no architecture problem at all, because the build happens on the machine that
+will run it.
+
+```bash
+cd /mnt/user/appdata/acme_commerce   # wherever you cloned it
 docker build -t acme-commerce:0.1.0 .
 ```
 
-**(b) Build on your laptop, push to GHCR, pull on Unraid.** The path a real team takes, and
-what CI will do in Milestone 5.
+The tradeoff: your Unraid box does the build, needs the source and a network connection to npm,
+and accumulates build-cache layers on the array.
+
+### 3.5 Option D — transfer a tarball
+
+No registry needed. Still architecture-sensitive, so build with `--platform` first.
 
 ```bash
-# Laptop:
-docker build -t ghcr.io/REPLACE_GITHUB_USER/acme-commerce:0.1.0 .
-docker push ghcr.io/REPLACE_GITHUB_USER/acme-commerce:0.1.0
-
-# Unraid:
-docker pull ghcr.io/REPLACE_GITHUB_USER/acme-commerce:0.1.0
-```
-
-**(c) Build on your laptop, transfer the tarball.** No registry needed.
-
-```bash
+docker buildx build --platform linux/amd64 -t acme-commerce:0.1.0 --load .
 docker save acme-commerce:0.1.0 | gzip > acme-commerce-0.1.0.tar.gz
 scp acme-commerce-0.1.0.tar.gz root@REPLACE_UNRAID_HOST:/tmp/
 ssh root@REPLACE_UNRAID_HOST 'gunzip -c /tmp/acme-commerce-0.1.0.tar.gz | docker load'
 ```
 
-**Tag with a real version, not `latest`.** `latest` makes "which build is running?"
-unanswerable and makes rollback guesswork. `GET /health` reports `version`, which is only
-useful if the tag means something.
+### 3.6 Tag with a real version, never `latest`
 
----
+`latest` makes "which build is running?" unanswerable and turns rollback into guesswork.
+`GET /health` reports `version` from `package.json`, which is only useful if the tag means
+something. Bump `package.json`, tag to match, and the two agree.
 
 ## 4. Environment variables
 
