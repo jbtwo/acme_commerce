@@ -35,10 +35,6 @@ queryParams:
     value: backpack
     disabled: true
     description: ""
-  - key: q
-    value: hydration
-    disabled: true
-    description: ""
 scripts:
   - type: afterResponse
     code: |-
