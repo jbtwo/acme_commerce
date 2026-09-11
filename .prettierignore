@@ -3,3 +3,9 @@ node_modules
 coverage
 openapi/openapi.json
 package-lock.json
+
+# Generated and owned by Postman's git integration, not by this repository. Prettier and
+# Postman would otherwise reformat these files in a loop on every sync, and the diff noise
+# would obscure the changes you actually made to a request.
+postman/
+.postman/

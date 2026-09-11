@@ -1,0 +1,235 @@
+# Build the Acme Commerce container image and publish it to GitHub Container Registry.
+#
+#   push to main      -> ghcr.io/jbtwo/acme_commerce:edge
+#   push tag vX.Y.Z   -> ghcr.io/jbtwo/acme_commerce:X.Y.Z, :X.Y, :latest
+#
+# `edge` is whatever main currently is. A version tag is a deliberate release. Keeping them
+# distinct is what lets you pull "the newest thing" without accidentally deploying it.
+#
+# No secrets to configure. GitHub Actions injects GITHUB_TOKEN automatically, and the
+# `packages: write` permission below is enough for it to push to GHCR under this account.
+# That is GHCR's main practical advantage over Docker Hub, where you would be pasting a PAT
+# into repository secrets.
+#
+# SCOPE: this workflow is a release pipeline with a PARTIAL gate. See the `verify` job for
+# exactly what it does and does not prove. The full CI pipeline — integration tests against a
+# PostgreSQL service container — arrives in Milestone 5 as a separate workflow.
+
+name: Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  # Lets you re-run a build from the Actions tab without pushing anything.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  # `github.repository` is already lowercase here (jbtwo/acme_commerce). GHCR rejects uppercase
+  # in an image path, so if the repository is ever renamed with capitals this needs lowercasing.
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
+  # Pinned to match `engines` in package.json and the Dockerfile. All three must agree — three
+  # environments on three different Node majors is a class of bug this project exists to teach
+  # rather than suffer.
+  NODE_VERSION: '26'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Gate. Everything here runs without a database.
+  # ---------------------------------------------------------------------------
+  #
+  # WHAT THIS PROVES
+  #   - The code compiles under strict TypeScript.
+  #   - Formatting and lint rules hold.
+  #   - The 114 unit tests pass, including the 34 covering the destructive-operation guard.
+  #   - The committed OpenAPI snapshot matches what the server would actually serve, so no
+  #     undocumented contract change can reach a release.
+  #   - The contract is structurally valid and passes the governance rules in redocly.yaml.
+  #
+  # WHAT IT DOES NOT PROVE
+  #   - Anything covered by the 147 integration tests. Those need real PostgreSQL, which needs
+  #     a service container, which is Milestone 5. Until then an image can pass this gate and
+  #     still have a broken SQL query.
+  #   - Anything about behaviour under load, TLS, or a real network.
+  #
+  # Stating the boundary rather than implying "green means tested" is the point.
+  verify:
+    name: Verify (no database)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      # `npm ci` rather than `npm install`: it installs exactly what package-lock.json specifies
+      # and fails if the lockfile is out of step, which is what makes the build reproducible.
+      - name: Install dependencies
+        run: npm ci
+
+      # A version tag that disagrees with package.json is the reason "which build is running?"
+      # becomes unanswerable: GET /health reports the package.json version, so tagging v0.3.0
+      # while package.json says 0.2.0 ships an image that lies about itself. Caught here
+      # instead of discovered during a post-deployment check.
+      - name: Tag must match package.json version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::Tag v${tag} does not match package.json version ${pkg}."
+            echo "Bump package.json to ${tag}, commit, then re-tag." >&2
+            exit 1
+          fi
+          echo "Tag v${tag} matches package.json."
+
+      - name: Formatting
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      # Regenerates the OpenAPI document and diffs it against openapi/openapi.json, failing on
+      # any difference. This is what makes an undocumented API change impossible to release by
+      # accident. It needs no database: the generator builds the app in-process with a synthetic
+      # config, and the PostgreSQL pool is lazy, so no connection is ever opened.
+      - name: OpenAPI drift check
+        run: npm run openapi:check
+
+      - name: OpenAPI lint
+        run: npm run openapi:lint
+
+  # ---------------------------------------------------------------------------
+  # Build, prove the image runs, then publish.
+  # ---------------------------------------------------------------------------
+  publish:
+    name: Build and publish to GHCR
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          # Automatically provided by Actions. No PAT, nothing stored in repository secrets.
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=edge,enable={{is_default_branch}}
+          # `latest` follows the highest semver tag, never a branch build.
+          flavor: |
+            latest=auto
+          labels: |
+            org.opencontainers.image.title=Acme Commerce API
+            org.opencontainers.image.description=Ecommerce API platform used as an API-engineering learning environment.
+
+      # Built for linux/amd64 only, which is what an Unraid box needs. The runner is amd64, so
+      # this is a native build with no emulation. Add linux/arm64 here if you ever need to run
+      # the same tag on ARM hardware — note that a multi-platform build cannot use `load`.
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          # Loaded into the runner's Docker daemon rather than pushed, so the next step can
+          # actually run it. Publishing happens only after that succeeds.
+          load: true
+          push: false
+          tags: acme-commerce:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Startup verification. Cheap, and it catches a class of failure the unit tests cannot:
+      # a missing runtime dependency, a bad CMD, a file the Dockerfile forgot to COPY. An image
+      # that compiles and does not boot is a real outcome.
+      #
+      # No database is provided on purpose, which lets this assert the design property that
+      # /health and /ready are genuinely different endpoints rather than aliases.
+      - name: Verify the image starts and serves
+        run: |
+          set -euo pipefail
+          docker run -d --name ci-check -p 3000:3000 \
+            -e DATABASE_URL='postgres://ci:ci@127.0.0.1:5432/ci_not_reachable' \
+            -e DB_CONNECT_TIMEOUT_MS=1000 \
+            acme-commerce:ci
+
+          echo "Waiting for the process to accept connections..."
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/health -o /tmp/health.json 2>/dev/null; then break; fi
+            sleep 1
+          done
+
+          echo "--- GET /health ---"
+          cat /tmp/health.json; echo
+          test "$(jq -r .status /tmp/health.json)" = "ok"
+
+          # /health must be 200 even though PostgreSQL is unreachable. If this ever starts
+          # failing, someone has made liveness depend on a dependency — which turns a database
+          # blip into an orchestrator restarting every container. See docs/DECISIONS.md D-016.
+          echo "--- GET /ready (expected 503, no database present) ---"
+          ready_code="$(curl -s -o /tmp/ready.json -w '%{http_code}' http://127.0.0.1:3000/ready)"
+          cat /tmp/ready.json; echo
+          if [ "$ready_code" != "503" ]; then
+            echo "::error::/ready returned ${ready_code}; expected 503 with no database reachable."
+            exit 1
+          fi
+
+          echo "--- version reported ---"
+          jq -r .version /tmp/health.json
+
+          docker logs ci-check
+          docker rm -f ci-check
+
+      # Cache hit from the build above, so this re-exports rather than rebuilding.
+      - name: Push to GHCR
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+
+      - name: Summary
+        run: |
+          {
+            echo "### Published"
+            echo
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+            echo
+            echo "Pull on Unraid, then apply migrations:"
+            echo
+            echo '```bash'
+            echo "docker exec acme-commerce node dist/db/cli.js up"
+            echo '```'
+            echo
+            echo "> Gate was unit-level only — integration tests need a PostgreSQL service"
+            echo "> container and arrive in Milestone 5."
+          } >> "$GITHUB_STEP_SUMMARY"
