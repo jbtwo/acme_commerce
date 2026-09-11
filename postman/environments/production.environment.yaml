@@ -1,0 +1,6 @@
+name: production
+values:
+  - key: base_url
+    value: 'http://10.0.1.7:3001'
+  - key: expected_app_env
+    value: production

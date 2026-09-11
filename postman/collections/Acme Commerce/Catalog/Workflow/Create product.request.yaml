@@ -1,0 +1,32 @@
+$kind: http-request
+name: Create product
+url: "{{base_url}}/api/v1/products"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+      "title": "Riverbend Packable Rain Jacket",
+      "description": "A 2.5-layer shell that stuffs into its own pocket.",
+      "status": "active",
+      "vendor": "Acme",
+      "product_type": "Apparel",
+      "tags": ["waterproof", "lightweight"]
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      const product = pm.response.json().data;
+
+      pm.test('created', () => pm.response.to.have.status(201));
+      pm.test('id looks like a product id', () => {
+        pm.expect(product.id).to.match(/^prod_[0-9a-f]{24}$/);
+      });
+      pm.test('Location points at the new product', () => {
+        pm.expect(pm.response.headers.get('Location')).to.eql(`/api/v1/products/${product.id}`);
+      });
+
+      pm.collectionVariables.set('product_id', product.id);
+      console.log('captured product_id:', product.id);
+    language: text/javascript
+order: 1789136337668

@@ -1,4 +1,18 @@
 $kind: http-request
-url: ''
+name: Health
+url: "{{base_url}}/health"
 method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      const expected = pm.environment.get('expected_app_env');
+
+      pm.test('an environment is selected and configured', () => {
+        pm.expect(expected, 'expected_app_env is not set — is an environment selected?').to.be.a('string');
+      });
+
+      pm.test('the API reports the environment I selected', () => {
+        pm.expect(pm.response.json().environment).to.eql(expected);
+      });
+    language: text/javascript
 order: 1788286248426

@@ -1,0 +1,26 @@
+$kind: http-request
+name: Create variant
+url: "{{base_url}}/api/v1/products/{{product_id}}/variants"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+      "sku": "{{run_sku}}",
+      "title": "Black / Medium",
+      "price_cents": 18900,
+      "compare_at_price_cents": 22900
+    }
+scripts:
+  - type: beforeRequest
+    code: pm.collectionVariables.set('run_sku', `RIVERBEND-BLK-M-${Date.now()}`);
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test('created', () => pm.response.to.have.status(201));
+      pm.test('carries this run\'s SKU', () => {
+        pm.expect(pm.response.json().data.sku).to.eql(pm.collectionVariables.get('run_sku'));
+      });
+      pm.collectionVariables.set('variant_id', pm.response.json().data.id);
+    language: text/javascript
+order: 523912756663296

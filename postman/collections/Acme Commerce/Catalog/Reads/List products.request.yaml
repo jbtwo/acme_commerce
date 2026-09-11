@@ -1,0 +1,57 @@
+$kind: http-request
+name: List products
+url: "{{base_url}}/api/v1/products?sort=title&order=asc"
+method: GET
+queryParams:
+  - key: limit
+    value: "5"
+    disabled: true
+    description: ""
+  - key: page
+    value: "2"
+    disabled: true
+    description: ""
+  - key: status
+    value: active
+    disabled: true
+    description: ""
+  - key: vendor
+    value: acme
+    disabled: true
+    description: ""
+  - key: sort
+    value: title
+    disabled: false
+    description: ""
+  - key: order
+    value: asc
+    disabled: false
+    description: ""
+  - key: tag
+    value: bestseller
+    disabled: true
+    description: ""
+  - key: q
+    value: backpack
+    disabled: true
+    description: ""
+  - key: q
+    value: hydration
+    disabled: true
+    description: ""
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('returns a page with pagination metadata', () => {
+        pm.response.to.have.status(200);
+        const b = pm.response.json();
+        pm.expect(b.data).to.be.an('array');
+        pm.expect(b.pagination).to.have.all.keys('page', 'limit', 'total', 'total_pages');
+      });
+
+      pm.test('sorted by title ascending', () => {
+        const titles = pm.response.json().data.map((p) => p.title);
+        pm.expect(titles).to.eql([...titles].sort());
+      });
+    language: text/javascript
+order: 1789136335821

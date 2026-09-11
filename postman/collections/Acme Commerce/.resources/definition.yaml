@@ -1,2 +1,18 @@
 $kind: collection
 name: Acme Commerce
+variables:
+  product_id: ""
+  run_sku: ""
+  seed_product_id: prod_7ebf51270d4d3de9f7acad4c
+  variant_id: ""
+scripts:
+  - type: http:beforeRequest
+    code: |-
+      if (!pm.environment.name) {
+        throw new Error('No environment selected. Pick development or production.');
+      }
+      const baseUrl = pm.environment.get('base_url');
+      if (!baseUrl) {
+        throw new Error(`Environment "${pm.environment.name}" has no base_url set.`);
+      }
+    language: text/javascript

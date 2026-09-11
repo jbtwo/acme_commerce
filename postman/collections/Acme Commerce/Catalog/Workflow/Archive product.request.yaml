@@ -1,0 +1,15 @@
+$kind: http-request
+name: Archive product
+url: "{{base_url}}/api/v1/products/{{product_id}}"
+method: DELETE
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('archived, not deleted', () => {
+        pm.response.to.have.status(200);
+        const d = pm.response.json().data;
+        pm.expect(d.status).to.eql('archived');
+        pm.expect(d.archived_at).to.not.be.null;
+      });
+    language: text/javascript
+order: 3931171101130480

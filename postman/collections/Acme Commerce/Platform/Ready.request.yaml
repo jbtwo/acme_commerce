@@ -1,4 +1,15 @@
 $kind: http-request
-url: ''
+name: Ready
+url: "{{base_url}}/ready"
 method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('ready to serve traffic', () => {
+        pm.response.to.have.status(200);
+        const c = pm.response.json().checks;
+        pm.expect(c.database.status, 'database').to.eql('ok');
+        pm.expect(c.migrations.status, 'migrations').to.eql('ok');
+      });
+    language: text/javascript
 order: 1477466899398792

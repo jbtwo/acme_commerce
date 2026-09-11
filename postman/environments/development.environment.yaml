@@ -2,3 +2,5 @@ name: development
 values:
   - key: base_url
     value: 'http://127.0.0.1:3000'
+  - key: expected_app_env
+    value: development

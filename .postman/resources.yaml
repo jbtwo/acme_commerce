@@ -1,8 +1,12 @@
 workspace:
   id: f83637e2-5f47-444c-8f4e-bd1f3a681610
+
 localResources:
   specs:
     - ../openapi/openapi.json
+
+# Each entry here maps a local resource to one or more corresponding objects in Postman Cloud
+
 cloudResources:
   collections:
     ../postman/collections/Acme Commerce: 57347314-90cacb2a-c96b-46ed-b9a9-39a2883c5b2d
