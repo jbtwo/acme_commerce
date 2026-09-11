@@ -8,7 +8,7 @@ Everything in §1–§13 was executed and the output observed. Nothing is claime
 "it should work". §14 lists what could **not** be verified here, and §15 is the specific list of
 things that require your Unraid server — that section is a deliverable, not a caveat.
 
-**Postman was not used.** Neither were Newman, the Postman CLI, nor any generated collection.
+**Postman was not used.** Neither was the Postman CLI, nor any generated collection.
 That separation is the point: you will be learning against an API already known to work, so
 when a request fails, "the API is broken" is a hypothesis to rule out rather than the assumed
 answer.
@@ -522,7 +522,7 @@ All smoke assertions passed.
 ```
 
 `scripts/smoke.sh` is committed as reproducible evidence rather than transcript-only output. It
-uses only `curl` and `python3` — **no Postman, no Newman**. Nine sections: platform endpoints,
+uses only `curl` and `python3` — **no Postman, no Postman CLI**. Nine sections: platform endpoints,
 request correlation, collection reads, catalog writes, variants, archive semantics, identifier
 failures, validation failures, query-parameter failures.
 

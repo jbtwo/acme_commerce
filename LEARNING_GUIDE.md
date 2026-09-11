@@ -674,10 +674,10 @@ whoever imports it gets a `404` they cannot explain.
 The single most useful thing to know about Postman and secrets. The terminology changed
 recently, so both names are worth carrying:
 
-| Postman app       | VS Code extension | Synced to cloud and git | Visible to Newman / Postman CLI / monitors |
-| ----------------- | ----------------- | ----------------------- | ------------------------------------------ |
-| **Value** (local) | Current value     | **No**                  | No                                         |
-| **Shared value**  | Initial value     | **Yes**                 | Yes                                        |
+| Postman app       | VS Code extension | Synced to cloud and git | Visible to the Postman CLI / monitors |
+| ----------------- | ----------------- | ----------------------- | ------------------------------------- |
+| **Value** (local) | Current value     | **No**                  | No                                    |
+| **Shared value**  | Initial value     | **Yes**                 | Yes                                   |
 
 In the Postman app there is now one **Value** column plus an explicit share action per row. The
 older two-column Initial/Current layout survives only in the VS Code extension.

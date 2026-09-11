@@ -190,7 +190,7 @@ handle, precisely so a test can reference a known record).
 
 This is the persona Postman fits best. Negative-case collections. Folder runs. `pm.test()`
 assertions on status, schema, and business rules. Chained workflows that reproduce a real
-sequence. Then the same collection in CI via Newman, giving regression coverage that a
+sequence. Then the same collection in CI via the Postman CLI, giving regression coverage that a
 non-developer can extend.
 
 ---
@@ -281,7 +281,7 @@ every run rather than truncating.
 
 ### How Postman helps
 
-Milestone 5: the exported collection runs in CI via Newman or the Postman CLI, giving a
+Milestone 5: the exported collection runs in CI via the Postman CLI, giving a
 post-deployment smoke test that a non-developer can read and extend.
 
 ---

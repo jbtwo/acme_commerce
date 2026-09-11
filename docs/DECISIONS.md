@@ -19,8 +19,8 @@ along with the reason it existed.
 `engines`, the `Dockerfile`, and (from Milestone 5) CI.
 
 **Why.** The decisive argument is language cohesion with the _learning_ goal, not performance.
-Postman pre-request scripts and `pm.test()` assertions are JavaScript. Newman and the Postman
-CLI are Node programs. One language spans the API implementation, the automated tests, and the
+Postman pre-request scripts and `pm.test()` assertions are JavaScript, and the Postman CLI is
+distributed as a Node program. One language spans the API implementation, the automated tests, and the
 Postman assets, so nothing is lost in translation between the two halves of this project.
 
 **Alternatives.** Python + FastAPI would have given a first-class OpenAPI story and Pydantic
