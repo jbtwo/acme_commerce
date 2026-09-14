@@ -57,11 +57,26 @@ LAST_STATUS=""
 LAST_BODY=""
 LAST_HEADERS=""
 
+# Bearer token for authenticated calls. Populated by section 0; empty until then, which is
+# what lets the early platform checks run before authentication exists.
+AUTH_TOKEN=""
+SUPPORT_TOKEN=""
+
 # request METHOD PATH [BODY] [EXTRA_CURL_ARGS...]
+#
+# Sends the developer bearer token when one has been obtained, unless the caller supplies its
+# own Authorization header. Use `anon_request` for the deliberately-unauthenticated checks.
 request() {
   local method="$1" path="$2" body="${3:-}"; shift 3 || shift 2
   local tmp_headers; tmp_headers="$(mktemp)"
   local args=(-sS -X "$method" -o /dev/stdout -w '\n%{http_code}' -D "$tmp_headers")
+  local caller_sets_auth=0
+  for a in "$@"; do
+    case "$(printf '%s' "$a" | tr 'A-Z' 'a-z')" in authorization:*) caller_sets_auth=1 ;; esac
+  done
+  if [[ -n "$AUTH_TOKEN" && $caller_sets_auth -eq 0 ]]; then
+    args+=(-H "Authorization: Bearer $AUTH_TOKEN")
+  fi
   # Only supply the default Content-Type when the caller has not passed one. curl sends a
   # repeated -H twice rather than replacing it, so without this check the "wrong Content-Type"
   # assertion would send both application/json and text/plain and test nothing.
@@ -79,6 +94,14 @@ request() {
   LAST_BODY="${out%$'\n'*}"
   LAST_HEADERS="$(cat "$tmp_headers")"
   rm -f "$tmp_headers"
+}
+
+# Same as request(), but never sends a token — for the 401 checks.
+anon_request() {
+  local saved="$AUTH_TOKEN"
+  AUTH_TOKEN=""
+  request "$@"
+  AUTH_TOKEN="$saved"
 }
 
 ok()   { PASS=$((PASS+1)); printf '  %s✓%s %s\n' "$green" "$reset" "$1"; }
@@ -143,7 +166,110 @@ request GET "${BASE_URL}/docs/"
 expect_status 'GET /docs/ (Swagger UI)' 200
 
 # ===========================================================================
-section '2. Request correlation'
+section '2. Authentication'
+# ===========================================================================
+request POST "${API}/auth/token" '{"email":"dev@acme.example","password":"dev-password-123"}'
+expect_status 'POST /auth/token (developer)' 200
+AUTH_TOKEN="$(printf '%s' "$LAST_BODY" | jget 'data.access_token')"
+if [[ "$(printf '%s' "$AUTH_TOKEN" | tr -cd '.' | wc -c | tr -d ' ')" == '2' ]]; then
+  ok 'token has three JWT segments'
+else
+  bad 'token has three JWT segments' "got: ${AUTH_TOKEN:0:40}"
+fi
+expect_field 'token type' 'data.token_type' 'Bearer'
+expect_field 'issued for the developer role' 'data.principal.role' 'developer'
+
+request POST "${API}/auth/token" '{"email":"support@acme.example","password":"dev-password-123"}'
+expect_status 'POST /auth/token (support)' 200
+SUPPORT_TOKEN="$(printf '%s' "$LAST_BODY" | jget 'data.access_token')"
+
+request GET "${API}/auth/me"
+expect_status 'GET /auth/me' 200
+expect_field 'identity email' 'data.email' 'dev@acme.example'
+
+anon_request POST "${API}/auth/token" '{"email":"dev@acme.example","password":"wrong"}'
+expect_error_code 'wrong password' 401 'INVALID_CREDENTIALS'
+
+anon_request POST "${API}/auth/token" '{"email":"nobody@acme.example","password":"dev-password-123"}'
+expect_error_code 'unknown email (same code — no account enumeration)' 401 'INVALID_CREDENTIALS'
+
+anon_request GET "${API}/auth/me"
+expect_error_code 'no Authorization header' 401 'AUTHENTICATION_REQUIRED'
+expect_header_present 'WWW-Authenticate on a 401' 'www-authenticate'
+
+anon_request GET "${API}/auth/me" '' -H 'Authorization: Basic dXNlcjpwYXNz'
+expect_error_code 'wrong auth scheme' 401 'INVALID_TOKEN'
+
+anon_request GET "${API}/auth/me" '' -H 'Authorization: Bearer not-a-jwt'
+expect_error_code 'malformed token' 401 'INVALID_TOKEN'
+
+# ===========================================================================
+section '2b. Authorization — support is read-only'
+# ===========================================================================
+request GET "${API}/locations" '' -H "Authorization: Bearer ${SUPPORT_TOKEN}"
+expect_status 'support can read locations' 200
+
+request POST "${API}/locations" '{"name":"Support Should Not Create","type":"warehouse"}' \
+  -H "Authorization: Bearer ${SUPPORT_TOKEN}"
+expect_error_code 'support cannot create a location' 403 'INSUFFICIENT_PERMISSION'
+required="$(printf '%s' "$LAST_BODY" | jget 'error.details.required_permission')"
+if [[ "$required" == 'locations:write' ]]; then ok '403 names the permission it wanted'
+else bad '403 names the required permission' "got '$required'"; fi
+
+request POST "${API}/products" '{"title":"Support Should Not Create"}' \
+  -H "Authorization: Bearer ${SUPPORT_TOKEN}"
+expect_error_code 'support cannot create a product' 403 'INSUFFICIENT_PERMISSION'
+
+# ===========================================================================
+section '2c. Catalog reads stay public; writes do not'
+# ===========================================================================
+anon_request GET "${API}/products?limit=1"
+expect_status 'anonymous can list products' 200
+
+anon_request GET "${API}/products/prod_7ebf51270d4d3de9f7acad4c"
+expect_status 'anonymous can read one product' 200
+
+anon_request POST "${API}/products" '{"title":"Anonymous"}'
+expect_error_code 'anonymous cannot create a product' 401 'AUTHENTICATION_REQUIRED'
+
+anon_request DELETE "${API}/products/prod_7ebf51270d4d3de9f7acad4c"
+expect_error_code 'anonymous cannot archive a product' 401 'AUTHENTICATION_REQUIRED'
+
+# ===========================================================================
+section '2d. Locations'
+# ===========================================================================
+request GET "${API}/locations"
+expect_status 'GET /locations' 200
+loc_total="$(printf '%s' "$LAST_BODY" | jget 'pagination.total')"
+if [[ "$loc_total" -ge 3 ]]; then ok "seeded locations present ($loc_total)"
+else bad 'seeded locations present' "total=$loc_total"; fi
+
+request POST "${API}/locations" "{\"name\":\"Smoke Depot ${RUN_ID}\",\"type\":\"warehouse\",\"city\":\"Toronto\",\"country\":\"CA\"}"
+expect_status 'POST /locations' 201
+LOCATION_ID="$(printf '%s' "$LAST_BODY" | jget 'data.id')"
+expect_header_present 'POST /locations sets Location' 'location'
+
+request GET "${API}/locations/${LOCATION_ID}"
+expect_status 'GET /locations/{id}' 200
+
+request PATCH "${API}/locations/${LOCATION_ID}" '{"is_active":false}'
+expect_status 'PATCH /locations/{id} retires it' 200
+expect_field 'location retired' 'data.is_active' 'False'
+
+request POST "${API}/locations" "{\"name\":\"smoke depot ${RUN_ID}\",\"type\":\"retail\"}"
+expect_error_code 'duplicate location name (case-insensitive)' 409 'LOCATION_NAME_EXISTS'
+
+request DELETE "${API}/locations/${LOCATION_ID}"
+expect_error_code 'locations have no DELETE — retire with is_active' 404 'ROUTE_NOT_FOUND'
+
+request GET "${API}/locations/loc_zzz"
+expect_error_code 'malformed location id' 400 'MALFORMED_ID'
+
+request GET "${API}/locations/loc_00000000000000000000dead"
+expect_error_code 'unknown location' 404 'LOCATION_NOT_FOUND'
+
+# ===========================================================================
+section '3. Request correlation'
 # ===========================================================================
 request GET "${BASE_URL}/health" '' -H 'X-Request-Id: smoke-test-correlation-42'
 echoed="$(header_value 'x-request-id')"
@@ -156,7 +282,7 @@ if [[ "$echoed" =~ ^req_[0-9a-f]{24}$ ]]; then ok 'invalid X-Request-Id is repla
 else bad 'invalid X-Request-Id is replaced' "got '$echoed'"; fi
 
 # ===========================================================================
-section '3. Catalog reads: pagination, filtering, search, sorting'
+section '4. Catalog reads: pagination, filtering, search, sorting'
 # ===========================================================================
 request GET "${API}/products"
 expect_status 'GET /products' 200
@@ -231,7 +357,7 @@ else
 fi
 
 # ===========================================================================
-section '4. Catalog writes'
+section '5. Catalog writes'
 # ===========================================================================
 request POST "${API}/products" "$(cat <<JSON
 {
@@ -270,7 +396,7 @@ expect_status 'PATCH with explicit null clears a field' 200
 expect_field 'description cleared' 'data.description' 'None'
 
 # ===========================================================================
-section '5. Variants'
+section '6. Variants'
 # ===========================================================================
 SKU="SMOKE-${RUN_ID}-BLK"
 request POST "${API}/products/${PRODUCT_ID}/variants" "{\"sku\":\"${SKU}\",\"title\":\"Black / Medium\",\"price_cents\":18900,\"compare_at_price_cents\":22900}"
@@ -301,7 +427,7 @@ expect_field 'variant price updated' 'data.price_cents' '15900'
 expect_field 'compare_at price cleared with null' 'data.compare_at_price_cents' 'None'
 
 # ===========================================================================
-section '6. Archive semantics (DELETE)'
+section '7. Archive semantics (DELETE)'
 # ===========================================================================
 request DELETE "${API}/variants/${VARIANT_ID}"
 expect_status 'DELETE /variants/{id}' 200
@@ -333,7 +459,7 @@ request DELETE "${API}/products/${DRAFT_PRODUCT_ID}"
 expect_status 'archive the second smoke-test product' 200
 
 # ===========================================================================
-section '7. Failure cases — identifiers'
+section '8. Failure cases — identifiers'
 # ===========================================================================
 request GET "${API}/products/prod_00000000000000000000dead"
 expect_error_code 'unknown product' 404 'PRODUCT_NOT_FOUND'
@@ -354,7 +480,7 @@ request GET "${BASE_URL}/api/v1/nonexistent"
 expect_error_code 'unknown route' 404 'ROUTE_NOT_FOUND'
 
 # ===========================================================================
-section '8. Failure cases — validation'
+section '9. Failure cases — validation'
 # ===========================================================================
 request POST "${API}/products" '{"vendor":"Acme"}'
 expect_error_code 'missing required product field (title)' 400 'VALIDATION_ERROR'
@@ -409,7 +535,7 @@ expect_error_code 'variant on an unknown product' 404 'PRODUCT_NOT_FOUND'
 request DELETE "${API}/products/${HOST_PRODUCT_ID}" >/dev/null 2>&1
 
 # ===========================================================================
-section '9. Failure cases — query parameters'
+section '10. Failure cases — query parameters'
 # ===========================================================================
 request GET "${API}/products?page=0"
 expect_error_code 'invalid pagination (page=0)' 400 'VALIDATION_ERROR'

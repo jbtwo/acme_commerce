@@ -26,13 +26,27 @@ export const ERROR_CODES = {
   UNSUPPORTED_MEDIA_TYPE: 415,
   PAYLOAD_TOO_LARGE: 413,
 
+  // -- Authentication: we do not know who you are ---------------------------
+  AUTHENTICATION_REQUIRED: 401,
+  INVALID_TOKEN: 401,
+  TOKEN_EXPIRED: 401,
+  INVALID_CREDENTIALS: 401,
+
+  // -- Authorization: we know who you are, and the answer is no -------------
+  INSUFFICIENT_PERMISSION: 403,
+
+  // -- Too many requests ----------------------------------------------------
+  RATE_LIMITED: 429,
+
   // -- Absent resources ------------------------------------------------------
   ROUTE_NOT_FOUND: 404,
+  LOCATION_NOT_FOUND: 404,
   PRODUCT_NOT_FOUND: 404,
   VARIANT_NOT_FOUND: 404,
 
   // -- Conflicts with existing state ----------------------------------------
   SKU_ALREADY_EXISTS: 409,
+  LOCATION_NAME_EXISTS: 409,
 
   // -- Server-side ----------------------------------------------------------
   INTERNAL_ERROR: 500,
@@ -140,6 +154,54 @@ export class SkuConflictError extends AppError {
       },
     });
     this.name = 'SkuConflictError';
+  }
+}
+
+/**
+ * 401 — the caller is not authenticated.
+ *
+ * Note the four distinct codes. `AUTHENTICATION_REQUIRED` (no header at all),
+ * `INVALID_TOKEN` (present but not usable), `TOKEN_EXPIRED` (was fine, isn't now), and
+ * `INVALID_CREDENTIALS` (username/password rejected). Only `TOKEN_EXPIRED` tells a client
+ * that re-authenticating will help — collapsing them all into one code takes that away.
+ */
+export class AuthenticationError extends AppError {
+  constructor(
+    code: 'AUTHENTICATION_REQUIRED' | 'INVALID_TOKEN' | 'TOKEN_EXPIRED' | 'INVALID_CREDENTIALS',
+    message: string,
+    details?: ErrorDetails,
+  ) {
+    super(code, message, details ? { details } : {});
+    this.name = 'AuthenticationError';
+  }
+}
+
+/**
+ * 403 — authenticated, but not permitted.
+ *
+ * Always names the permission that was required. An authorization failure that does not say
+ * what you needed is a support ticket; one that does is a self-service fix.
+ */
+export class AuthorizationError extends AppError {
+  constructor(required: string, held: readonly string[]) {
+    super('INSUFFICIENT_PERMISSION', `This action requires the "${required}" permission.`, {
+      details: {
+        required_permission: required,
+        your_permissions: [...held],
+        hint: 'Permissions come from your role. GET /api/v1/auth/me shows what yours are.',
+      },
+    });
+    this.name = 'AuthorizationError';
+  }
+}
+
+export class RateLimitedError extends AppError {
+  constructor(retryAfterSeconds: number, limit: number, windowSeconds: number) {
+    super('RATE_LIMITED', 'Too many requests. Slow down and try again shortly.', {
+      retryAfterSeconds,
+      details: { limit, window_seconds: windowSeconds, retry_after_seconds: retryAfterSeconds },
+    });
+    this.name = 'RateLimitedError';
   }
 }
 

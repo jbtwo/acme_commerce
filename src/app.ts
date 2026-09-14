@@ -25,6 +25,10 @@ import { setupValidation } from './http/validation.js';
 import { PLATFORM_SHARED_SCHEMAS, registerPlatformRoutes } from './http/platform-routes.js';
 import { CATALOG_SHARED_SCHEMAS } from './domain/catalog/schemas.js';
 import { registerCatalogRoutes } from './domain/catalog/routes.js';
+import { AUTH_SHARED_SCHEMAS } from './domain/auth/schemas.js';
+import { registerAuthRoutes } from './domain/auth/routes.js';
+import { LOCATION_SHARED_SCHEMAS } from './domain/locations/schemas.js';
+import { registerLocationRoutes } from './domain/locations/routes.js';
 import { buildSwaggerOptions } from './openapi/spec.js';
 
 export const API_V1_PREFIX = '/api/v1';
@@ -110,7 +114,12 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   // resolution and OpenAPI components) AND into both Ajv instances (so `$ref` resolves during
   // validation). Registering with only one of the two produces a boot-time failure that is
   // surprisingly hard to read.
-  for (const schema of [...PLATFORM_SHARED_SCHEMAS, ...CATALOG_SHARED_SCHEMAS]) {
+  for (const schema of [
+    ...PLATFORM_SHARED_SCHEMAS,
+    ...CATALOG_SHARED_SCHEMAS,
+    ...AUTH_SHARED_SCHEMAS,
+    ...LOCATION_SHARED_SCHEMAS,
+  ]) {
     validation.addSchema(schema as unknown as Record<string, unknown>);
   }
 
@@ -122,6 +131,8 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
 
   await app.register(registerPlatformRoutes);
   await app.register(registerCatalogRoutes, { prefix: API_V1_PREFIX });
+  await app.register(registerAuthRoutes, { prefix: API_V1_PREFIX });
+  await app.register(registerLocationRoutes, { prefix: API_V1_PREFIX });
 
   return app;
 }

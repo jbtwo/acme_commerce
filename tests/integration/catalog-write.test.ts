@@ -6,20 +6,33 @@
  * exactly the class of bug an API-only test cannot see.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestHarness, json, type ApiError, type TestHarness } from '../helpers/app.js';
+import {
+  bearer,
+  createTestHarness,
+  json,
+  type ApiError,
+  type TestHarness,
+} from '../helpers/app.js';
 import type { ProductResource, VariantResource } from '../../src/domain/catalog/schemas.js';
 
 let h: TestHarness;
+let auth: string;
 
 beforeAll(async () => {
   h = await createTestHarness();
+  auth = await bearer(h, 'developer');
 });
 afterAll(async () => {
   await h?.close();
 });
 
 const createProduct = async (body: Record<string, unknown>) => {
-  const res = await h.app.inject({ method: 'POST', url: '/api/v1/products', payload: body });
+  const res = await h.app.inject({
+    method: 'POST',
+    url: '/api/v1/products',
+    headers: { authorization: auth },
+    payload: body,
+  });
   return {
     status: res.statusCode,
     headers: res.headers,
@@ -85,6 +98,7 @@ describe('PATCH /api/v1/products/{id}', () => {
     const res = await h.app.inject({
       method: 'PATCH',
       url: `/api/v1/products/${created.body.data.id}`,
+      headers: { authorization: auth },
       payload: { product_type: 'Outerwear' },
     });
     expect(res.statusCode).toBe(200);
@@ -104,6 +118,7 @@ describe('PATCH /api/v1/products/{id}', () => {
     const res = await h.app.inject({
       method: 'PATCH',
       url: `/api/v1/products/${created.body.data.id}`,
+      headers: { authorization: auth },
       payload: { description: null },
     });
     const patched = json<{ data: ProductResource }>(res.body).data;
@@ -117,6 +132,7 @@ describe('PATCH /api/v1/products/{id}', () => {
     const res = await h.app.inject({
       method: 'PATCH',
       url: `/api/v1/products/${created.body.data.id}`,
+      headers: { authorization: auth },
       payload: { tags: ['z'] },
     });
     expect(json<{ data: ProductResource }>(res.body).data.tags).toEqual(['z']);
@@ -129,6 +145,7 @@ describe('PATCH /api/v1/products/{id}', () => {
     const res = await h.app.inject({
       method: 'PATCH',
       url: `/api/v1/products/${created.body.data.id}`,
+      headers: { authorization: auth },
       payload: { title: 'Timestamp test v2' },
     });
     const after = json<{ data: ProductResource }>(res.body).data;
@@ -142,6 +159,7 @@ describe('PATCH /api/v1/products/{id}', () => {
     const res = await h.app.inject({
       method: 'PATCH',
       url: `/api/v1/products/${created.body.data.id}`,
+      headers: { authorization: auth },
       payload: { status: 'draft' },
     });
     expect(res.statusCode).toBe(200);
@@ -156,6 +174,7 @@ describe('variants', () => {
     const res = await h.app.inject({
       method: 'POST',
       url: `/api/v1/products/${product.body.data.id}/variants`,
+      headers: { authorization: auth },
       payload: { sku, title: 'Black / Medium', price_cents: 18900, compare_at_price_cents: 22900 },
     });
     expect(res.statusCode).toBe(201);
@@ -175,6 +194,7 @@ describe('variants', () => {
       const res = await h.app.inject({
         method: 'POST',
         url: `/api/v1/products/${product.body.data.id}/variants`,
+        headers: { authorization: auth },
         payload: { sku: uniqueSku(), title: `V${i}`, price_cents: 100 },
       });
       positions.push(json<{ data: VariantResource }>(res.body).data.position);
@@ -188,6 +208,7 @@ describe('variants', () => {
     const first = await h.app.inject({
       method: 'POST',
       url: `/api/v1/products/${product.body.data.id}/variants`,
+      headers: { authorization: auth },
       payload: { sku, title: 'First', price_cents: 100 },
     });
     expect(first.statusCode).toBe(201);
@@ -196,6 +217,7 @@ describe('variants', () => {
     const second = await h.app.inject({
       method: 'POST',
       url: `/api/v1/products/${product.body.data.id}/variants`,
+      headers: { authorization: auth },
       payload: { sku, title: 'Second', price_cents: 200 },
     });
     expect(second.statusCode).toBe(409);
@@ -212,11 +234,13 @@ describe('variants', () => {
     await h.app.inject({
       method: 'POST',
       url: `/api/v1/products/${a.body.data.id}/variants`,
+      headers: { authorization: auth },
       payload: { sku, title: 'A', price_cents: 100 },
     });
     const res = await h.app.inject({
       method: 'POST',
       url: `/api/v1/products/${b.body.data.id}/variants`,
+      headers: { authorization: auth },
       payload: { sku, title: 'B', price_cents: 100 },
     });
     expect(res.statusCode).toBe(409);
@@ -232,6 +256,7 @@ describe('variants', () => {
         h.app.inject({
           method: 'POST',
           url: `/api/v1/products/${product.body.data.id}/variants`,
+          headers: { authorization: auth },
           payload: { sku, title: `Racer ${i}`, price_cents: 100 + i },
         }),
       ),
@@ -251,11 +276,13 @@ describe('variants', () => {
     await h.app.inject({
       method: 'POST',
       url: `/api/v1/products/${product.body.data.id}/variants`,
+      headers: { authorization: auth },
       payload: { sku: takenSku, title: 'Taken', price_cents: 100 },
     });
     const mine = await h.app.inject({
       method: 'POST',
       url: `/api/v1/products/${product.body.data.id}/variants`,
+      headers: { authorization: auth },
       payload: { sku: uniqueSku(), title: 'Mine', price_cents: 100 },
     });
     const mineId = json<{ data: VariantResource }>(mine.body).data.id;
@@ -263,6 +290,7 @@ describe('variants', () => {
     const res = await h.app.inject({
       method: 'PATCH',
       url: `/api/v1/variants/${mineId}`,
+      headers: { authorization: auth },
       payload: { sku: takenSku },
     });
     expect(res.statusCode).toBe(409);
@@ -273,6 +301,7 @@ describe('variants', () => {
     const res = await h.app.inject({
       method: 'POST',
       url: `/api/v1/products/${product.body.data.id}/variants`,
+      headers: { authorization: auth },
       payload: { sku: uniqueSku(), title: 'On an archived product', price_cents: 100 },
     });
     expect(res.statusCode).toBe(201);
@@ -288,6 +317,7 @@ describe('DELETE archives rather than destroys', () => {
     const res = await h.app.inject({
       method: 'DELETE',
       url: `/api/v1/products/${created.body.data.id}`,
+      headers: { authorization: auth },
     });
     expect(res.statusCode).toBe(200);
     const archived = json<{ data: ProductResource }>(res.body).data;
@@ -309,10 +339,12 @@ describe('DELETE archives rather than destroys', () => {
     const first = await h.app.inject({
       method: 'DELETE',
       url: `/api/v1/products/${created.body.data.id}`,
+      headers: { authorization: auth },
     });
     const second = await h.app.inject({
       method: 'DELETE',
       url: `/api/v1/products/${created.body.data.id}`,
+      headers: { authorization: auth },
     });
     expect(first.statusCode).toBe(200);
     expect(second.statusCode).toBe(200);
@@ -321,7 +353,11 @@ describe('DELETE archives rather than destroys', () => {
 
   it('keeps an archived product retrievable', async () => {
     const created = await createProduct({ title: 'Still readable', status: 'active' });
-    await h.app.inject({ method: 'DELETE', url: `/api/v1/products/${created.body.data.id}` });
+    await h.app.inject({
+      method: 'DELETE',
+      url: `/api/v1/products/${created.body.data.id}`,
+      headers: { authorization: auth },
+    });
     const res = await h.app.inject({
       method: 'GET',
       url: `/api/v1/products/${created.body.data.id}`,
@@ -335,10 +371,15 @@ describe('DELETE archives rather than destroys', () => {
       await h.app.inject({
         method: 'POST',
         url: `/api/v1/products/${product.body.data.id}/variants`,
+        headers: { authorization: auth },
         payload: { sku: uniqueSku(), title: `V${i}`, price_cents: 100 },
       });
     }
-    await h.app.inject({ method: 'DELETE', url: `/api/v1/products/${product.body.data.id}` });
+    await h.app.inject({
+      method: 'DELETE',
+      url: `/api/v1/products/${product.body.data.id}`,
+      headers: { authorization: auth },
+    });
 
     const rows = await h.db
       .selectFrom('variants')
@@ -354,13 +395,19 @@ describe('DELETE archives rather than destroys', () => {
     await h.app.inject({
       method: 'POST',
       url: `/api/v1/products/${product.body.data.id}/variants`,
+      headers: { authorization: auth },
       payload: { sku: uniqueSku(), title: 'V', price_cents: 100 },
     });
-    await h.app.inject({ method: 'DELETE', url: `/api/v1/products/${product.body.data.id}` });
+    await h.app.inject({
+      method: 'DELETE',
+      url: `/api/v1/products/${product.body.data.id}`,
+      headers: { authorization: auth },
+    });
 
     const res = await h.app.inject({
       method: 'PATCH',
       url: `/api/v1/products/${product.body.data.id}`,
+      headers: { authorization: auth },
       payload: { status: 'active' },
     });
     expect(res.statusCode).toBe(200);
@@ -379,17 +426,23 @@ describe('DELETE archives rather than destroys', () => {
     const created = await h.app.inject({
       method: 'POST',
       url: `/api/v1/products/${product.body.data.id}/variants`,
+      headers: { authorization: auth },
       payload: { sku: uniqueSku(), title: 'Target', price_cents: 100 },
     });
     const sibling = await h.app.inject({
       method: 'POST',
       url: `/api/v1/products/${product.body.data.id}/variants`,
+      headers: { authorization: auth },
       payload: { sku: uniqueSku(), title: 'Sibling', price_cents: 100 },
     });
     const targetId = json<{ data: VariantResource }>(created.body).data.id;
     const siblingId = json<{ data: VariantResource }>(sibling.body).data.id;
 
-    const res = await h.app.inject({ method: 'DELETE', url: `/api/v1/variants/${targetId}` });
+    const res = await h.app.inject({
+      method: 'DELETE',
+      url: `/api/v1/variants/${targetId}`,
+      headers: { authorization: auth },
+    });
     expect(res.statusCode).toBe(200);
     expect(json<{ data: VariantResource }>(res.body).data.status).toBe('archived');
 

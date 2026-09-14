@@ -7,16 +7,25 @@
  * too, because "returns 400" and "returns a 400 you can act on" are different products.
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestHarness, json, type ApiError, type TestHarness } from '../helpers/app.js';
+import {
+  bearer,
+  createTestHarness,
+  json,
+  type ApiError,
+  type TestHarness,
+} from '../helpers/app.js';
 
 let h: TestHarness;
+let auth: string;
 let productId: string;
 
 beforeAll(async () => {
   h = await createTestHarness();
+  auth = await bearer(h, 'developer');
   const res = await h.app.inject({
     method: 'POST',
     url: '/api/v1/products',
+    headers: { authorization: auth },
     payload: { title: 'Error fixture product', status: 'active' },
   });
   productId = json<{ data: { id: string } }>(res.body).data.id;
@@ -79,9 +88,34 @@ describe('identifier errors', () => {
     'DELETE /api/v1/variants/nope',
   ])('%s also returns MALFORMED_ID', async (spec) => {
     const [method, url] = spec.split(' ') as [string, string];
-    const res = await h.app.inject({ method: method as 'GET', url });
+    // Authenticated: on a protected route the auth gate runs first, so without a token this
+    // would be 401 and would say nothing about the identifier. See the test below.
+    const res = await h.app.inject({
+      method: method as 'GET',
+      url,
+      headers: { authorization: auth },
+    });
     expect(res.statusCode).toBe(400);
     expectError(res.body, 'MALFORMED_ID');
+  });
+
+  it('authenticates before it validates — an anonymous caller learns nothing about their input', async () => {
+    // DELETE is protected, so a malformed id from an unauthenticated caller is 401, not 400.
+    // That ordering is deliberate: the auth gate is outside everything, and telling an
+    // anonymous caller "your identifier was well-formed but the resource is missing" is a
+    // disclosure they have not earned.
+    const anonymous = await h.app.inject({ method: 'DELETE', url: '/api/v1/products/prod_bad' });
+    expect(anonymous.statusCode).toBe(401);
+    expectError(anonymous.body, 'AUTHENTICATION_REQUIRED');
+
+    // The identical request with a token reaches validation and gets the useful answer.
+    const authenticated = await h.app.inject({
+      method: 'DELETE',
+      url: '/api/v1/products/prod_bad',
+      headers: { authorization: auth },
+    });
+    expect(authenticated.statusCode).toBe(400);
+    expectError(authenticated.body, 'MALFORMED_ID');
   });
 
   it('404 ROUTE_NOT_FOUND is distinct from a missing resource', async () => {
@@ -99,6 +133,7 @@ describe('body validation errors', () => {
     const res = await h.app.inject({
       method: 'POST',
       url: '/api/v1/products',
+      headers: { authorization: auth },
       payload: { vendor: 'Acme' },
     });
     expect(res.statusCode).toBe(400);
@@ -111,6 +146,7 @@ describe('body validation errors', () => {
     const res = await h.app.inject({
       method: 'POST',
       url: '/api/v1/products',
+      headers: { authorization: auth },
       payload: { title: 'X', status: 'pending' },
     });
     expect(res.statusCode).toBe(400);
@@ -124,6 +160,7 @@ describe('body validation errors', () => {
     const res = await h.app.inject({
       method: 'POST',
       url: '/api/v1/products',
+      headers: { authorization: auth },
       payload: { title: 'X', titel: 'typo' },
     });
     expect(res.statusCode).toBe(400);
@@ -136,6 +173,7 @@ describe('body validation errors', () => {
     const res = await h.app.inject({
       method: 'POST',
       url: '/api/v1/products',
+      headers: { authorization: auth },
       payload: { title: 'X', id: 'prod_0199f3a9c4e21b7d05f6a3b8' },
     });
     expect(res.statusCode).toBe(400);
@@ -145,6 +183,7 @@ describe('body validation errors', () => {
     const res = await h.app.inject({
       method: 'POST',
       url: `/api/v1/products/${productId}/variants`,
+      headers: { authorization: auth },
       payload: { position: 0 },
     });
     expect(res.statusCode).toBe(400);
@@ -156,6 +195,7 @@ describe('body validation errors', () => {
     const res = await h.app.inject({
       method: 'PATCH',
       url: `/api/v1/products/${productId}`,
+      headers: { authorization: auth },
       payload: {},
     });
     expect(res.statusCode).toBe(400);
@@ -172,6 +212,7 @@ describe('body validation errors', () => {
     const res = await h.app.inject({
       method: 'POST',
       url: `/api/v1/products/${productId}/variants`,
+      headers: { authorization: auth },
       payload: {
         sku: `BAD-${Date.now()}-${Math.random()}`,
         title: 'Bad price',
@@ -188,6 +229,7 @@ describe('body validation errors', () => {
     const res = await h.app.inject({
       method: 'POST',
       url: `/api/v1/products/${productId}/variants`,
+      headers: { authorization: auth },
       payload: { sku: `COERCE-${Date.now()}`, title: 'X', price_cents: '1999' },
     });
     expect(res.statusCode).toBe(400);
@@ -197,7 +239,7 @@ describe('body validation errors', () => {
     const res = await h.app.inject({
       method: 'POST',
       url: '/api/v1/products',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', authorization: auth },
       payload: '{"title":',
     });
     expect(res.statusCode).toBe(400);
@@ -205,11 +247,26 @@ describe('body validation errors', () => {
     expect(err.details?.parser_message).toBeDefined();
   });
 
+  it('answers 401 before it ever looks at the body — auth is the outermost gate', async () => {
+    // Registered as an onRequest hook rather than a preHandler, so authentication runs before
+    // body parsing and before schema validation. Without that, an anonymous caller sending
+    // malformed JSON to a protected route would get 400 and learn that the route exists and
+    // what it expects. Now every protected route answers anonymous callers identically.
+    const res = await h.app.inject({
+      method: 'POST',
+      url: '/api/v1/products',
+      headers: { 'content-type': 'application/json' },
+      payload: '{"title":',
+    });
+    expect(res.statusCode).toBe(401);
+    expectError(res.body, 'AUTHENTICATION_REQUIRED');
+  });
+
   it('returns 415 for a non-JSON content type', async () => {
     const res = await h.app.inject({
       method: 'POST',
       url: '/api/v1/products',
-      headers: { 'content-type': 'text/plain' },
+      headers: { 'content-type': 'text/plain', authorization: auth },
       payload: 'title=X',
     });
     expect(res.statusCode).toBe(415);

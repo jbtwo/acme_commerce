@@ -14,6 +14,8 @@
 import { createHash } from 'node:crypto';
 import type { AppDatabase } from '../index.js';
 import { SEED_EXPECTED, SEED_PRODUCTS } from './data.js';
+import { SEED_AUTH_EXPECTED, SEED_LOCATIONS, SEED_USERS } from './auth-data.js';
+import { hashPassword } from '../../domain/auth/passwords.js';
 
 /**
  * Derive a stable identifier from a natural key.
@@ -32,6 +34,8 @@ export interface SeedSummary {
   variants: number;
   productsInserted: number;
   variantsInserted: number;
+  users: number;
+  locations: number;
 }
 
 /** Archived seed records need a consistent archived_at — the schema CHECK requires it. */
@@ -135,10 +139,102 @@ export async function seedDatabase(db: AppDatabase): Promise<SeedSummary> {
     );
   }
 
+  const { users, locations } = await seedAuthAndLocations(db);
+
   return {
     products: SEED_EXPECTED.products,
     variants: SEED_EXPECTED.variants,
     productsInserted,
     variantsInserted,
+    users,
+    locations,
   };
+}
+
+/**
+ * Seed development users and inventory locations.
+ *
+ * Password hashing is done once per user per seed run rather than storing a precomputed hash
+ * in source. scrypt is salted, so a checked-in hash would be a fixed salt shared by every
+ * clone of this repository — a bad habit to demonstrate even where the password is public.
+ */
+async function seedAuthAndLocations(
+  db: AppDatabase,
+): Promise<{ users: number; locations: number }> {
+  const userRows = await Promise.all(
+    SEED_USERS.map(async (u) => ({
+      id: deterministicId('usr', u.handle),
+      email: u.email,
+      name: u.name,
+      password_hash: await hashPassword(u.password),
+      role: u.role,
+      is_active: true,
+    })),
+  );
+
+  let users = 0;
+  let locations = 0;
+
+  await db.transaction().execute(async (trx) => {
+    for (const row of userRows) {
+      const written = await trx
+        .insertInto('users')
+        .values(row)
+        .onConflict((oc) =>
+          oc.column('id').doUpdateSet({
+            email: row.email,
+            name: row.name,
+            // Re-hashed on every seed, which also means changing SEED_PASSWORD takes effect
+            // on the next `db:seed` rather than needing a reset.
+            password_hash: row.password_hash,
+            role: row.role,
+            is_active: true,
+          }),
+        )
+        .returning('id')
+        .executeTakeFirst();
+      if (written) users += 1;
+    }
+
+    for (const l of SEED_LOCATIONS) {
+      const written = await trx
+        .insertInto('locations')
+        .values({
+          id: deterministicId('loc', l.handle),
+          name: l.name,
+          type: l.type,
+          address_line1: l.address_line1,
+          address_line2: null,
+          city: l.city,
+          region: l.region,
+          postal_code: l.postal_code,
+          country: l.country,
+          is_active: true,
+        })
+        .onConflict((oc) =>
+          oc.column('id').doUpdateSet({
+            name: l.name,
+            type: l.type,
+            address_line1: l.address_line1,
+            city: l.city,
+            region: l.region,
+            postal_code: l.postal_code,
+            country: l.country,
+          }),
+        )
+        .returning('id')
+        .executeTakeFirst();
+      if (written) locations += 1;
+    }
+  });
+
+  if (users !== SEED_AUTH_EXPECTED.users) {
+    throw new Error(`Seed wrote ${users} users but expected ${SEED_AUTH_EXPECTED.users}`);
+  }
+  if (locations !== SEED_AUTH_EXPECTED.locations) {
+    throw new Error(
+      `Seed wrote ${locations} locations but expected ${SEED_AUTH_EXPECTED.locations}`,
+    );
+  }
+  return { users, locations };
 }

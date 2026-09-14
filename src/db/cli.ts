@@ -192,8 +192,8 @@ async function commandSeed(): Promise<void> {
     }
     const summary = await seedDatabase(db);
     console.log(
-      `Seeded ${summary.products} products and ${summary.variants} variants ` +
-        `(${summary.productsInserted} products / ${summary.variantsInserted} variants written).`,
+      `Seeded ${summary.products} products, ${summary.variants} variants, ` +
+        `${summary.users} users, ${summary.locations} locations.`,
     );
   });
 }
@@ -225,7 +225,10 @@ async function commandReset(argv: string[]): Promise<void> {
     if (result.error) fail(`Migration failed after reset: ${String(result.error)}`);
     console.log(`  ${result.applied.length} migration(s) applied`);
     const summary = await seedDatabase(db);
-    console.log(`  ${summary.products} products, ${summary.variants} variants seeded`);
+    console.log(
+      `  ${summary.products} products, ${summary.variants} variants, ` +
+        `${summary.users} users, ${summary.locations} locations seeded`,
+    );
     console.log('\nReset complete.');
   } finally {
     await db.destroy();

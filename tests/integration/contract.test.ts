@@ -17,7 +17,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Ajv } from 'ajv';
 import addFormats from 'ajv-formats';
 import type { FormatsPlugin } from 'ajv-formats';
-import { createTestHarness, json, type TestHarness } from '../helpers/app.js';
+import { bearer, createTestHarness, json, type TestHarness } from '../helpers/app.js';
 
 interface OpenApiDocument {
   openapi: string;
@@ -46,10 +46,12 @@ interface Operation {
 }
 
 let h: TestHarness;
+let auth: string;
 let served: OpenApiDocument;
 
 beforeAll(async () => {
   h = await createTestHarness();
+  auth = await bearer(h, 'developer');
   const res = await h.app.inject({ method: 'GET', url: '/openapi.json' });
   served = json<OpenApiDocument>(res.body);
 });
@@ -147,6 +149,49 @@ describe('operation completeness', () => {
         const schema = response.content?.['application/json']?.schema as { $ref?: string };
         expect(schema?.$ref, `${m} ${p} ${status}`).toBe('#/components/schemas/Error');
       }
+    }
+  });
+});
+
+describe('security', () => {
+  it('declares the bearerAuth scheme', () => {
+    const schemes = (
+      served as unknown as { components: { securitySchemes?: Record<string, unknown> } }
+    ).components.securitySchemes;
+    expect(schemes?.bearerAuth).toMatchObject({
+      type: 'http',
+      scheme: 'bearer',
+      bearerFormat: 'JWT',
+    });
+  });
+
+  it('declares security on every operation that actually requires a permission', async () => {
+    // Catalog reads are legitimately unauthenticated, so "this operation has no security block"
+    // is not by itself a defect. The only way to tell an intentional omission from a spec that
+    // quietly under-documents auth is to ask the running server: call each operation with no
+    // credentials and see whether it answers 401.
+    const skip = new Set(['createToken']);
+    for (const [path, method, op] of operations()) {
+      if (!path.startsWith('/api/') || skip.has(op.operationId ?? '')) continue;
+
+      const url = path
+        .replace('{productId}', 'prod_00000000000000000000dead')
+        .replace('{variantId}', 'var_00000000000000000000dead')
+        .replace('{locationId}', 'loc_00000000000000000000dead');
+
+      const res = await h.app.inject({
+        method: method.toUpperCase() as 'GET',
+        url,
+        ...(method === 'post' || method === 'patch' ? { payload: {} } : {}),
+      });
+
+      const requiresAuth = res.statusCode === 401;
+      const declaresAuth = Array.isArray((op as { security?: unknown[] }).security);
+      expect(
+        declaresAuth,
+        `${method.toUpperCase()} ${path} returns ${res.statusCode} without a token but ` +
+          `${declaresAuth ? 'does' : 'does NOT'} declare security`,
+      ).toBe(requiresAuth);
     }
   });
 });
@@ -284,6 +329,7 @@ describe('real responses conform to the declared schemas', () => {
     const res = await h.app.inject({
       method: 'POST',
       url: '/api/v1/products',
+      headers: { authorization: auth },
       payload: schema.example!,
     });
     expect(res.statusCode).toBe(201);
@@ -293,6 +339,7 @@ describe('real responses conform to the declared schemas', () => {
     const product = await h.app.inject({
       method: 'POST',
       url: '/api/v1/products',
+      headers: { authorization: auth },
       payload: { title: 'Example host', status: 'active' },
     });
     const productId = json<{ data: { id: string } }>(product.body).data.id;
@@ -301,6 +348,7 @@ describe('real responses conform to the declared schemas', () => {
     const res = await h.app.inject({
       method: 'POST',
       url: `/api/v1/products/${productId}/variants`,
+      headers: { authorization: auth },
       payload: schema.example!,
     });
     expect(res.statusCode).toBe(201);

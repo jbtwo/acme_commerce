@@ -12,7 +12,11 @@ import {
   redactConnectionString,
 } from '../../src/config/index.js';
 
-const MINIMAL = { DATABASE_URL: 'postgres://u:secret@db.local:5432/acme' };
+const SECRET = 'x'.repeat(48);
+const MINIMAL = {
+  DATABASE_URL: 'postgres://u:secret@db.local:5432/acme',
+  AUTH_TOKEN_SECRET: SECRET,
+};
 
 describe('loadConfig', () => {
   it('applies documented defaults when only a database URL is given', () => {
@@ -43,6 +47,7 @@ describe('loadConfig', () => {
         PGDATABASE: 'acme_commerce',
         PGUSER: 'acme_app',
         PGPASSWORD: 'p@ss word/with?chars',
+        AUTH_TOKEN_SECRET: SECRET,
       },
     });
     expect(config.database.host).toBe('pg.unraid.local');
@@ -60,13 +65,43 @@ describe('loadConfig', () => {
   });
 
   it('refuses when no database configuration is present at all', () => {
-    expect(() => loadConfig({ env: {} })).toThrowError(/No database configuration found/);
+    expect(() => loadConfig({ env: { AUTH_TOKEN_SECRET: SECRET } })).toThrowError(
+      /No database configuration found/,
+    );
+  });
+
+  it('refuses to start without AUTH_TOKEN_SECRET — a signing key has no safe default', () => {
+    expect(() => loadConfig({ env: { DATABASE_URL: 'postgres://u:p@h:5432/d' } })).toThrowError(
+      /AUTH_TOKEN_SECRET is required/,
+    );
+  });
+
+  it('refuses a signing key shorter than 32 characters', () => {
+    expect(() => loadConfig({ env: { ...MINIMAL, AUTH_TOKEN_SECRET: 'short' } })).toThrowError(
+      /at least 32 characters/,
+    );
+  });
+
+  it('applies auth defaults', () => {
+    const c = loadConfig({ env: MINIMAL });
+    expect(c.auth.tokenTtlSeconds).toBe(3600);
+    expect(c.auth.rateLimitMax).toBe(10);
+    expect(c.auth.rateLimitWindowSeconds).toBe(60);
+  });
+
+  it.each([
+    ['AUTH_TOKEN_TTL_SECONDS', '30'],
+    ['AUTH_TOKEN_TTL_SECONDS', '100000'],
+    ['AUTH_RATE_LIMIT_MAX', '0'],
+    ['AUTH_RATE_LIMIT_WINDOW_SECONDS', '0'],
+  ])('rejects %s=%s', (key, value) => {
+    expect(() => loadConfig({ env: { ...MINIMAL, [key]: value } })).toThrowError(ConfigError);
   });
 
   it('refuses an incomplete discrete configuration', () => {
-    expect(() => loadConfig({ env: { PGHOST: 'h', PGDATABASE: 'd' } })).toThrowError(
-      /Incomplete discrete database configuration/,
-    );
+    expect(() =>
+      loadConfig({ env: { PGHOST: 'h', PGDATABASE: 'd', AUTH_TOKEN_SECRET: SECRET } }),
+    ).toThrowError(/Incomplete discrete database configuration/);
   });
 
   it('reports every problem at once, so one restart reveals every typo', () => {

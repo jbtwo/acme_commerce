@@ -193,12 +193,18 @@ if [[ ! -f .env ]]; then
   cp .env.example .env
   # macOS and GNU sed disagree about -i, so the file is rewritten rather than edited in place.
   python3 - "$DEV_URL" "$TEST_URL" <<'PY'
-import re, sys
+import base64, re, secrets, sys
 dev, test = sys.argv[1], sys.argv[2]
 s = open('.env').read()
 s = re.sub(r'^DATABASE_URL=.*$', f'DATABASE_URL={dev}', s, flags=re.M)
 s = re.sub(r'^TEST_DATABASE_URL=.*$', f'TEST_DATABASE_URL={test}', s, flags=re.M)
 s = re.sub(r'^HOST=.*$', 'HOST=127.0.0.1', s, flags=re.M)
+# AUTH_TOKEN_SECRET has no default and the app refuses to start without one, so a
+# fresh checkout needs a real key generated here rather than a placeholder copied
+# from .env.example.
+s = re.sub(r'^AUTH_TOKEN_SECRET=.*$',
+           'AUTH_TOKEN_SECRET=' + base64.b64encode(secrets.token_bytes(48)).decode(),
+           s, flags=re.M)
 open('.env', 'w').write(s)
 PY
   ok 'Wrote .env (gitignored)'

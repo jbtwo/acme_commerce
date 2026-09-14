@@ -47,3 +47,25 @@ export function json<T = unknown>(body: string): T {
 export interface ApiError {
   error: { code: string; message: string; request_id: string; details?: Record<string, unknown> };
 }
+
+/** Seeded development credentials. Fixtures, published in the README — not secrets. */
+export const SEED_LOGINS = {
+  developer: { email: 'dev@acme.example', password: 'dev-password-123' },
+  support: { email: 'support@acme.example', password: 'dev-password-123' },
+  admin: { email: 'admin@acme.example', password: 'dev-password-123' },
+} as const;
+
+export type SeedRole = keyof typeof SEED_LOGINS;
+
+/** Log in as a seeded user and return an `Authorization` header value. */
+export async function bearer(h: TestHarness, role: SeedRole): Promise<string> {
+  const res = await h.app.inject({
+    method: 'POST',
+    url: '/api/v1/auth/token',
+    payload: SEED_LOGINS[role],
+  });
+  if (res.statusCode !== 200) {
+    throw new Error(`Could not authenticate as ${role}: ${res.statusCode} ${res.body}`);
+  }
+  return `Bearer ${json<{ data: { access_token: string } }>(res.body).data.access_token}`;
+}

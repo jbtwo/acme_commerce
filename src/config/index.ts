@@ -31,6 +31,15 @@ export interface DatabaseConfig {
   statementTimeoutMs: number;
 }
 
+export interface AuthConfig {
+  /** HS256 signing key. Never logged, never returned by an endpoint. */
+  tokenSecret: string;
+  tokenTtlSeconds: number;
+  /** Token-endpoint rate limit: attempts allowed per window, per client IP. */
+  rateLimitMax: number;
+  rateLimitWindowSeconds: number;
+}
+
 export interface Config {
   appEnv: AppEnv;
   isProduction: boolean;
@@ -40,6 +49,7 @@ export interface Config {
   logPretty: boolean;
   migrateOnStartup: boolean;
   database: DatabaseConfig;
+  auth: AuthConfig;
   /** Present only when TEST_DATABASE_URL (or discrete test vars) is configured. */
   testDatabaseUrl: string | undefined;
   /** Read from package.json at build time; surfaced by /health for deployment verification. */
@@ -275,6 +285,48 @@ export function loadConfig(options: LoadConfigOptions = {}): Config {
   if (statementTimeoutMs === null)
     problems.push(`DB_STATEMENT_TIMEOUT_MS must be an integer 0–600000`);
 
+  // -- Authentication --------------------------------------------------------
+  /*
+   * AUTH_TOKEN_SECRET is required, with no default.
+   *
+   * A signing key with a default value is not a signing key: every deployment that never
+   * changed it would verify every other deployment's tokens. Refusing to start is the correct
+   * behaviour, even though it means an existing container will not come back up after an
+   * upgrade until the variable is set. That is documented in the deployment guide.
+   *
+   * The 32-character floor is a floor, not a recommendation. HS256 keys should have at least
+   * as much entropy as the hash is wide: `openssl rand -base64 48`.
+   */
+  const tokenSecret = env.AUTH_TOKEN_SECRET ?? '';
+  if (!tokenSecret.trim()) {
+    problems.push(
+      'AUTH_TOKEN_SECRET is required and has no default. Generate one with ' +
+        '`openssl rand -base64 48`. A signing key with a default value would mean every ' +
+        'deployment could forge tokens for every other.',
+    );
+  } else if (tokenSecret.length < 32) {
+    problems.push(
+      `AUTH_TOKEN_SECRET must be at least 32 characters (got ${tokenSecret.length}). ` +
+        'Generate one with `openssl rand -base64 48`.',
+    );
+  }
+
+  const tokenTtlSeconds = parseInteger(env.AUTH_TOKEN_TTL_SECONDS, 3600, { min: 60, max: 86_400 });
+  if (tokenTtlSeconds === null) {
+    problems.push('AUTH_TOKEN_TTL_SECONDS must be an integer between 60 and 86400 (one day)');
+  }
+
+  const rateLimitMax = parseInteger(env.AUTH_RATE_LIMIT_MAX, 10, { min: 1, max: 10_000 });
+  if (rateLimitMax === null) problems.push('AUTH_RATE_LIMIT_MAX must be an integer 1-10000');
+
+  const rateLimitWindowSeconds = parseInteger(env.AUTH_RATE_LIMIT_WINDOW_SECONDS, 60, {
+    min: 1,
+    max: 3600,
+  });
+  if (rateLimitWindowSeconds === null) {
+    problems.push('AUTH_RATE_LIMIT_WINDOW_SECONDS must be an integer 1-3600');
+  }
+
   // -- Test database (optional; validated hard by src/db/guard.ts when used) --
   const testDatabaseUrl = env.TEST_DATABASE_URL?.trim() || undefined;
 
@@ -300,6 +352,12 @@ export function loadConfig(options: LoadConfigOptions = {}): Config {
       idleTimeoutMs: idleTimeoutMs!,
       connectTimeoutMs: connectTimeoutMs!,
       statementTimeoutMs: statementTimeoutMs!,
+    },
+    auth: {
+      tokenSecret,
+      tokenTtlSeconds: tokenTtlSeconds!,
+      rateLimitMax: rateLimitMax!,
+      rateLimitWindowSeconds: rateLimitWindowSeconds!,
     },
     testDatabaseUrl,
     version: options.version ?? process.env.APP_VERSION ?? '0.1.0',

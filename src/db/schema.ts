@@ -57,14 +57,52 @@ export interface VariantsTable {
   archived_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
 }
 
+export type UserRole = 'developer' | 'support' | 'admin';
+export type LocationType = 'warehouse' | 'retail' | 'virtual';
+
+export interface UsersTable {
+  id: string;
+  email: string;
+  name: string;
+  /** scrypt$N$r$p$salt$hash. Never selected into anything that leaves the process. */
+  password_hash: string;
+  role: UserRole;
+  is_active: Generated<boolean>;
+  created_at: CreatedAt;
+  updated_at: UpdatedAt;
+}
+
+export interface LocationsTable {
+  id: string;
+  name: string;
+  type: LocationType;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  region: string | null;
+  postal_code: string | null;
+  country: string | null;
+  is_active: Generated<boolean>;
+  created_at: CreatedAt;
+  updated_at: UpdatedAt;
+}
+
 export interface Database {
   products: ProductsTable;
   variants: VariantsTable;
+  users: UsersTable;
+  locations: LocationsTable;
 }
 
 export type ProductRow = Selectable<ProductsTable>;
 export type NewProductRow = Insertable<ProductsTable>;
 export type ProductUpdate = Updateable<ProductsTable>;
+
+export type UserRow = Selectable<UsersTable>;
+export type NewUserRow = Insertable<UsersTable>;
+export type LocationRow = Selectable<LocationsTable>;
+export type NewLocationRow = Insertable<LocationsTable>;
+export type LocationUpdate = Updateable<LocationsTable>;
 
 export type VariantRow = Selectable<VariantsTable>;
 export type NewVariantRow = Insertable<VariantsTable>;

@@ -97,6 +97,369 @@
         "title": "HealthResponse",
         "type": "object"
       },
+      "Identity": {
+        "additionalProperties": false,
+        "description": "The authenticated caller, as the server currently understands them.",
+        "properties": {
+          "email": {
+            "description": "Email address.",
+            "type": "string"
+          },
+          "id": {
+            "description": "User identifier. Appears as the `sub` claim in the token.",
+            "type": "string"
+          },
+          "name": {
+            "description": "Display name.",
+            "type": "string"
+          },
+          "permissions": {
+            "description": "Every permission this role holds. What a 403 is checked against.",
+            "items": {
+              "description": "A single capability, in `domain:action` form.",
+              "enum": [
+                "catalog:read",
+                "catalog:write",
+                "locations:read",
+                "locations:write",
+                "inventory:read",
+                "inventory:write",
+                "pricing:read"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "role": {
+            "description": "Internal role. Determines the permission set; permissions are derived from the role at request time, never carried inside the token.",
+            "enum": [
+              "developer",
+              "support",
+              "admin"
+            ],
+            "type": "string"
+          },
+          "token_expires_at": {
+            "description": "When the presented token stops being accepted.",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "name",
+          "role",
+          "permissions",
+          "token_expires_at"
+        ],
+        "title": "Identity",
+        "type": "object"
+      },
+      "IdentityResponse": {
+        "additionalProperties": false,
+        "description": "The identity behind the presented token.",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Identity"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "IdentityResponse",
+        "type": "object"
+      },
+      "Location": {
+        "additionalProperties": false,
+        "description": "A place where inventory is held.",
+        "properties": {
+          "address_line1": {
+            "description": "Street address. Null for a virtual location.",
+            "maxLength": 200,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "address_line2": {
+            "description": "Unit, suite, or floor.",
+            "maxLength": 200,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "city": {
+            "description": "City.",
+            "maxLength": 100,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "country": {
+            "description": "ISO 3166-1 alpha-2 country code, uppercase.",
+            "maxLength": 2,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "created_at": {
+            "description": "RFC 3339 creation timestamp.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "description": "Server-assigned identifier.",
+            "pattern": "^loc_[0-9a-f]{24}$",
+            "type": "string"
+          },
+          "is_active": {
+            "description": "Whether the location is in use. Locations are never deleted — inventory history references them — so retiring one means setting this to false.",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "Human-readable name. Unique, case-insensitively.",
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "postal_code": {
+            "description": "Postal or ZIP code.",
+            "maxLength": 20,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "region": {
+            "description": "Province, state, or region.",
+            "maxLength": 100,
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "type": {
+            "description": "Kind of location. `warehouse` fulfils orders, `retail` is a physical store, `virtual` covers dropship and in-transit stock that has no address.",
+            "enum": [
+              "warehouse",
+              "retail",
+              "virtual"
+            ],
+            "type": "string"
+          },
+          "updated_at": {
+            "description": "RFC 3339 last-modified timestamp.",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type",
+          "address_line1",
+          "address_line2",
+          "city",
+          "region",
+          "postal_code",
+          "country",
+          "is_active",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Location",
+        "type": "object"
+      },
+      "LocationCreate": {
+        "additionalProperties": false,
+        "description": "Body for creating an inventory location.",
+        "example": {
+          "address_line1": "3020 Centre Street NE",
+          "city": "Calgary",
+          "country": "CA",
+          "name": "Calgary Warehouse",
+          "postal_code": "T2E 2X7",
+          "region": "AB",
+          "type": "warehouse"
+        },
+        "properties": {
+          "address_line1": {
+            "description": "Street address.",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "address_line2": {
+            "description": "Unit or suite.",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "city": {
+            "description": "City.",
+            "maxLength": 100,
+            "type": "string"
+          },
+          "country": {
+            "description": "ISO 3166-1 alpha-2, uppercase.",
+            "pattern": "^[A-Z]{2}$",
+            "type": "string"
+          },
+          "is_active": {
+            "default": true,
+            "description": "Defaults to true.",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "Required. Must be unique.",
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "postal_code": {
+            "description": "Postal or ZIP code.",
+            "maxLength": 20,
+            "type": "string"
+          },
+          "region": {
+            "description": "Province or state.",
+            "maxLength": 100,
+            "type": "string"
+          },
+          "type": {
+            "description": "Kind of location. `warehouse` fulfils orders, `retail` is a physical store, `virtual` covers dropship and in-transit stock that has no address.",
+            "enum": [
+              "warehouse",
+              "retail",
+              "virtual"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type"
+        ],
+        "title": "LocationCreate",
+        "type": "object"
+      },
+      "LocationListResponse": {
+        "additionalProperties": false,
+        "description": "A page of locations with pagination metadata.",
+        "properties": {
+          "data": {
+            "description": "The requested page of locations.",
+            "items": {
+              "$ref": "#/components/schemas/Location"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "title": "LocationListResponse",
+        "type": "object"
+      },
+      "LocationResponse": {
+        "additionalProperties": false,
+        "description": "A single location.",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Location"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "LocationResponse",
+        "type": "object"
+      },
+      "LocationUpdate": {
+        "additionalProperties": false,
+        "description": "Partial update. Omitted properties are unchanged; explicit null clears one.",
+        "example": {
+          "is_active": false
+        },
+        "minProperties": 1,
+        "properties": {
+          "address_line1": {
+            "description": "New street address; null clears it.",
+            "maxLength": 200,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "address_line2": {
+            "description": "New unit or suite; null clears it.",
+            "maxLength": 200,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "city": {
+            "description": "New city; null clears it.",
+            "maxLength": 100,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "country": {
+            "description": "New ISO 3166-1 alpha-2 code; null clears it.",
+            "pattern": "^[A-Z]{2}$",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "is_active": {
+            "description": "Set false to retire the location without deleting it.",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "New name.",
+            "maxLength": 100,
+            "minLength": 1,
+            "type": "string"
+          },
+          "postal_code": {
+            "description": "New postal code; null clears it.",
+            "maxLength": 20,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "region": {
+            "description": "New region; null clears it.",
+            "maxLength": 100,
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": {
+            "description": "Kind of location. `warehouse` fulfils orders, `retail` is a physical store, `virtual` covers dropship and in-transit stock that has no address.",
+            "enum": [
+              "warehouse",
+              "retail",
+              "virtual"
+            ],
+            "type": "string"
+          }
+        },
+        "title": "LocationUpdate",
+        "type": "object"
+      },
       "Pagination": {
         "additionalProperties": false,
         "description": "Offset pagination metadata, present on every collection response.",
@@ -516,6 +879,81 @@
         "title": "ReadinessResponse",
         "type": "object"
       },
+      "TokenRequest": {
+        "additionalProperties": false,
+        "description": "Credentials exchanged for a bearer token.",
+        "example": {
+          "email": "dev@acme.example",
+          "password": "dev-password-123"
+        },
+        "properties": {
+          "email": {
+            "description": "Email address of a development user. Case-insensitive.",
+            "maxLength": 320,
+            "minLength": 3,
+            "type": "string"
+          },
+          "password": {
+            "description": "The user's password. Seeded development users share one; see the README.",
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "TokenRequest",
+        "type": "object"
+      },
+      "TokenResponse": {
+        "additionalProperties": false,
+        "description": "A newly issued development bearer token, with the identity it represents.",
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "access_token": {
+                "description": "A JWT. Send it as `Authorization: Bearer <token>`. It is signed, not encrypted — anyone holding it can read every claim inside it, so treat it as a credential.",
+                "type": "string"
+              },
+              "expires_at": {
+                "description": "Absolute expiry, RFC 3339.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "expires_in": {
+                "description": "Lifetime in seconds from issue.",
+                "type": "integer"
+              },
+              "principal": {
+                "$ref": "#/components/schemas/Identity"
+              },
+              "token_type": {
+                "description": "Always `Bearer`.",
+                "enum": [
+                  "Bearer"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "access_token",
+              "token_type",
+              "expires_in",
+              "expires_at",
+              "principal"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "TokenResponse",
+        "type": "object"
+      },
       "Variant": {
         "additionalProperties": false,
         "description": "A purchasable unit of a product: one SKU, one price. Inventory and orders reference variants, not products.",
@@ -788,6 +1226,14 @@
         "title": "VariantUpdate",
         "type": "object"
       }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "bearerFormat": "JWT",
+        "description": "A development bearer token from `POST /api/v1/auth/token`.\n\nSend it as `Authorization: Bearer <token>`.\n\nThe token is a JWT: signed, **not encrypted**. Anyone holding it can read every claim inside it, so treat it as a credential and keep it out of anything you commit. It cannot be revoked individually — it is valid until it expires.\n\nCatalog **reads** are deliberately unauthenticated: a storefront browses the catalog without credentials. Everything that writes, and everything under locations, inventory, and pricing, requires a token.",
+        "scheme": "bearer",
+        "type": "http"
+      }
     }
   },
   "externalDocs": {
@@ -799,7 +1245,7 @@
       "email": "platform@acme.example",
       "name": "Acme Commerce Platform Team"
     },
-    "description": "Acme Commerce is a fictional ecommerce platform whose APIs are the product. This document\ndescribes the internal API used by first-party applications.\n\n## Conventions\n\n**Envelopes.** A single resource is `{ \"data\": { ... } }`. A paginated collection is\n`{ \"data\": [ ... ], \"pagination\": { ... } }`. Every error is\n`{ \"error\": { \"code\", \"message\", \"request_id\", \"details\"? } }`. Wrapping leaves room to add\nmetadata later without breaking existing clients.\n\nThe platform endpoints `/health`, `/ready`, and `/openapi.json` sit outside that envelope\nand outside the version prefix, deliberately: they describe the process, not the product, and\na container probe should not have to track API versions.\n\n**Field naming.** `snake_case` in JSON, everywhere, in both directions.\n\n**Money.** Integer minor units with a separate currency — `price_cents: 12900` with\n`currency: \"CAD\"` means CAD 129.00. Never a float: IEEE-754 cannot represent 0.10 exactly,\nand money arithmetic in floats produces off-by-a-cent errors that survive most test suites.\n\n**Timestamps.** RFC 3339 in UTC, always with an explicit offset.\n\n**Identifiers.** Prefixed and opaque: `prod_` or `var_` followed by 24 lowercase hex\ncharacters. Assigned by the server; never constructed by a client. A syntactically invalid id\nreturns `400 MALFORMED_ID`, while a well-formed id naming nothing returns `404` — so a\nbroken string interpolation is distinguishable from a deleted record.\n\n## Correlation\n\nSend `X-Request-Id` to correlate a request with your own systems, or omit it and the server\ngenerates one. Either way the value comes back in the `X-Request-Id` **response header** on\nevery response, success or failure, and appears in `error.request_id`. It is on every server\nlog line for that request. When something goes wrong, that string is what makes the server-side\nstory findable.\n\n## Pagination\n\nOffset-based: `page` (default 1) and `limit` (default 25, maximum 100). An out-of-range\n`limit` is rejected with `400` rather than silently clamped. An empty result set is `200`\nwith `\"data\": []`, never `404`. `total_pages` is `0` when `total` is `0`.\n\nEvery sort appends `id` as a tiebreaker, so paging through a sorted list cannot show the same\nrecord twice or skip one.\n\n## Strictness\n\nUnknown properties in a request body, and unknown query parameters, are **rejected with 400**\nrather than ignored. Most public APIs ignore them. This one does not, because\n`?statuss=active` quietly returning every product is a worse outcome than a loud error that\nnames the unrecognised parameter.\n\n## Errors\n\nBranch on `error.code`, never on `error.message` — the code is the contract and the message\nis prose that may be reworded at any time. `error.details` carries structured context whose\nshape depends on the code.\n\n## Authentication\n\n**None in Milestone 1.** Every endpoint here is open. Bearer tokens and roles arrive in\nMilestone 2, and partner API keys in Milestone 4. This is a learning environment; do not\ndeploy it anywhere it can be reached from the internet.",
+    "description": "Acme Commerce is a fictional ecommerce platform whose APIs are the product. This document\ndescribes the internal API used by first-party applications.\n\n## Conventions\n\n**Envelopes.** A single resource is `{ \"data\": { ... } }`. A paginated collection is\n`{ \"data\": [ ... ], \"pagination\": { ... } }`. Every error is\n`{ \"error\": { \"code\", \"message\", \"request_id\", \"details\"? } }`. Wrapping leaves room to add\nmetadata later without breaking existing clients.\n\nThe platform endpoints `/health`, `/ready`, and `/openapi.json` sit outside that envelope\nand outside the version prefix, deliberately: they describe the process, not the product, and\na container probe should not have to track API versions.\n\n**Field naming.** `snake_case` in JSON, everywhere, in both directions.\n\n**Money.** Integer minor units with a separate currency — `price_cents: 12900` with\n`currency: \"CAD\"` means CAD 129.00. Never a float: IEEE-754 cannot represent 0.10 exactly,\nand money arithmetic in floats produces off-by-a-cent errors that survive most test suites.\n\n**Timestamps.** RFC 3339 in UTC, always with an explicit offset.\n\n**Identifiers.** Prefixed and opaque: `prod_` or `var_` followed by 24 lowercase hex\ncharacters. Assigned by the server; never constructed by a client. A syntactically invalid id\nreturns `400 MALFORMED_ID`, while a well-formed id naming nothing returns `404` — so a\nbroken string interpolation is distinguishable from a deleted record.\n\n## Correlation\n\nSend `X-Request-Id` to correlate a request with your own systems, or omit it and the server\ngenerates one. Either way the value comes back in the `X-Request-Id` **response header** on\nevery response, success or failure, and appears in `error.request_id`. It is on every server\nlog line for that request. When something goes wrong, that string is what makes the server-side\nstory findable.\n\n## Pagination\n\nOffset-based: `page` (default 1) and `limit` (default 25, maximum 100). An out-of-range\n`limit` is rejected with `400` rather than silently clamped. An empty result set is `200`\nwith `\"data\": []`, never `404`. `total_pages` is `0` when `total` is `0`.\n\nEvery sort appends `id` as a tiebreaker, so paging through a sorted list cannot show the same\nrecord twice or skip one.\n\n## Strictness\n\nUnknown properties in a request body, and unknown query parameters, are **rejected with 400**\nrather than ignored. Most public APIs ignore them. This one does not, because\n`?statuss=active` quietly returning every product is a worse outcome than a loud error that\nnames the unrecognised parameter.\n\n## Errors\n\nBranch on `error.code`, never on `error.message` — the code is the contract and the message\nis prose that may be reworded at any time. `error.details` carries structured context whose\nshape depends on the code.\n\n## Authentication\n\nGet a token from `POST /api/v1/auth/token` and send it as `Authorization: Bearer <token>`.\n\n**Catalog reads are deliberately open.** A storefront browses products without credentials.\nEverything that writes — and all of locations, inventory, and pricing — requires a token.\n\nThree roles, and permissions are what routes actually check:\n\n| Role | Holds |\n|---|---|\n| `developer` | every read and write except admin-only actions |\n| `support` | **read-only** across every domain |\n| `admin` | everything |\n\n`401` means the server does not know who you are — send credentials. `403` means it knows\nexactly who you are and the answer is still no; retrying with the same token will not help. A\n`403` always names the permission it wanted, in `error.details.required_permission`.\n`GET /api/v1/auth/me` reports the permissions you actually hold.\n\nThis is a **development** auth flow, not an identity provider. Tokens cannot be revoked\nindividually and seeded passwords are published in the README. Do not deploy this where it can\nbe reached from the internet. Partner API keys arrive in Milestone 4.",
     "license": {
       "identifier": "MIT",
       "name": "MIT"
@@ -810,6 +1256,630 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/auth/me": {
+      "get": {
+        "description": "Returns the identity behind the presented token, including the full permission set\nand when the token expires.\n\nThe most useful endpoint in the API while you are debugging a `403`: it answers\n\"who does the server think I am, and what am I allowed to do\" without guessing.\n\nPermissions are resolved from the user's **current** role, not from the `role` claim\nin the token. Change someone's role and it takes effect on their next request rather\nthan when their token expires.",
+        "operationId": "getCurrentIdentity",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityResponse"
+                }
+              }
+            },
+            "description": "The authenticated identity."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The request is malformed (`VALIDATION_ERROR` or `INVALID_JSON`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Missing, malformed, invalid, or expired token."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An unexpected server error. `error.request_id` identifies it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The database is unreachable. Safe to retry."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Describe the authenticated caller",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/api/v1/auth/token": {
+      "post": {
+        "description": "Issues a signed JWT for a known development user.\n\n**This is a development authentication flow, not an identity provider.** There is no\nregistration, password reset, email verification, refresh token, or session. It exists\nso that bearer tokens, roles, permissions, and expiry have something real to attach to.\nDo not model a production auth system on it.\n\n**The token is signed, not encrypted.** Decode the middle segment and you can read every\nclaim — that is normal and expected. The signature makes the claims tamper-evident, not\nsecret. Nothing sensitive is put inside it.\n\n**Tokens cannot be revoked.** A stateless token is valid until it expires; the only\nglobal lever is rotating the signing secret. That is why the lifetime is short. A\ndeactivated user *is* rejected immediately, because the account is re-read on every\nrequest rather than trusted from the token.\n\nUnknown email, wrong password, and deactivated account all return the identical\n`401 INVALID_CREDENTIALS`, in comparable time. Distinguishing them would let this\nendpoint be used to discover which accounts exist.\n\nRate limited per client IP — it is unauthenticated and runs a deliberately expensive\npassword hash on every call.",
+        "operationId": "createToken",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            },
+            "description": "A newly issued bearer token."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The request is malformed (`VALIDATION_ERROR` or `INVALID_JSON`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Email or password is incorrect (`INVALID_CREDENTIALS`)."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Too many attempts from this client. See the `Retry-After` header (`RATE_LIMITED`)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An unexpected server error. `error.request_id` identifies it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The database is unreachable. Safe to retry."
+          }
+        },
+        "summary": "Exchange credentials for a bearer token",
+        "tags": [
+          "Authentication"
+        ]
+      }
+    },
+    "/api/v1/locations": {
+      "get": {
+        "description": "Paginated, filterable list of the places inventory is held.\n\nWith no `is_active` filter, both active and retired locations are returned — the same\nno-hidden-filter rule as the catalog. The result set is fully determined by the query\nstring.\n\nRequires the `locations:read` permission, which every role has.",
+        "operationId": "listLocations",
+        "parameters": [
+          {
+            "description": "One-based page number.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Records per page, max 100.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Kind of location. `warehouse` fulfils orders, `retail` is a physical store, `virtual` covers dropship and in-transit stock that has no address.",
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "enum": [
+                "warehouse",
+                "retail",
+                "virtual"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by active state. Omit to return locations of both states.",
+            "in": "query",
+            "name": "is_active",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Case-insensitive substring match on name and city.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "maxLength": 100,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Sort field. Allowlisted; `id` is appended as a stable tiebreaker.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "name",
+              "enum": [
+                "name",
+                "type",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Sort direction.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "default": "asc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationListResponse"
+                }
+              }
+            },
+            "description": "A page of locations."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The request is malformed (`VALIDATION_ERROR`, `MALFORMED_ID`, or `INVALID_JSON`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Missing, malformed, invalid, or expired bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Authenticated, but your role lacks the required permission (`INSUFFICIENT_PERMISSION`)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An unexpected server error."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The database is unreachable. Safe to retry."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List inventory locations",
+        "tags": [
+          "Locations"
+        ]
+      },
+      "post": {
+        "description": "Creates a location. Names are unique case-insensitively; a duplicate returns `409`.\n\nRequires `locations:write`. The `support` role does not have it — logging in as\nsupport and calling this is the shortest way to see a `403` that names the permission\nit wanted.",
+        "operationId": "createLocation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocationCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationResponse"
+                }
+              }
+            },
+            "description": "The location that was created."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The request is malformed (`VALIDATION_ERROR`, `MALFORMED_ID`, or `INVALID_JSON`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Missing, malformed, invalid, or expired bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Authenticated, but your role lacks the required permission (`INSUFFICIENT_PERMISSION`)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "A location with that name already exists (`LOCATION_NAME_EXISTS`)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An unexpected server error."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The database is unreachable. Safe to retry."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Create an inventory location",
+        "tags": [
+          "Locations"
+        ]
+      }
+    },
+    "/api/v1/locations/{locationId}": {
+      "get": {
+        "description": "Returns one location. A syntactically invalid id returns `400 MALFORMED_ID`; a well-formed id naming nothing returns `404`.",
+        "operationId": "getLocation",
+        "parameters": [
+          {
+            "description": "Location identifier as returned by the API.",
+            "in": "path",
+            "name": "locationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationResponse"
+                }
+              }
+            },
+            "description": "The requested location."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The request is malformed (`VALIDATION_ERROR`, `MALFORMED_ID`, or `INVALID_JSON`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Missing, malformed, invalid, or expired bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Authenticated, but your role lacks the required permission (`INSUFFICIENT_PERMISSION`)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No location exists with that identifier (`LOCATION_NOT_FOUND`)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An unexpected server error."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The database is unreachable. Safe to retry."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Retrieve a location",
+        "tags": [
+          "Locations"
+        ]
+      },
+      "patch": {
+        "description": "Updates only the properties present in the body. Omitted properties are unchanged; an\nexplicit `null` clears a nullable one.\n\n**There is no DELETE.** A location is referenced by inventory levels and by the\nadjustment audit log, so removing one would orphan history that has to stay\nanswerable. Retire a location with `{\"is_active\": false}` instead — which is what\n\"delete this warehouse\" actually means in a business that has shipped from it.",
+        "operationId": "updateLocation",
+        "parameters": [
+          {
+            "description": "Location identifier as returned by the API.",
+            "in": "path",
+            "name": "locationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocationUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationResponse"
+                }
+              }
+            },
+            "description": "The location after the update."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The request is malformed (`VALIDATION_ERROR`, `MALFORMED_ID`, or `INVALID_JSON`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Missing, malformed, invalid, or expired bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Authenticated, but your role lacks the required permission (`INSUFFICIENT_PERMISSION`)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No location exists with that identifier (`LOCATION_NOT_FOUND`)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Another location already uses that name (`LOCATION_NAME_EXISTS`)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An unexpected server error."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The database is unreachable. Safe to retry."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Partially update a location",
+        "tags": [
+          "Locations"
+        ]
+      }
+    },
     "/api/v1/products": {
       "get": {
         "description": "Returns a page of products with pagination metadata.\n\n**No implicit filtering.** With no `status` parameter, products of every status are\nreturned, archived ones included. This API applies no hidden default filter: the result\nset is fully determined by the query string. Most catalog APIs hide archived records;\nthis one does not, so that DELETE is observable as a state change rather than as a\ndisappearance.\n\nFilters combine with AND. An empty result is `200` with `\"data\": []`, never `404` —\nan empty collection is a successful answer to a well-formed question. A page past the\nend is also `200` with an empty array.\n\n**Unknown query parameters are rejected with 400**, not ignored. `?statuss=active`\nsilently returning every product is a worse outcome than a loud error.\n\nOrdering always ends with `id` as a tiebreaker, so paging through a sorted list cannot\nshow the same record twice.\n\nEvery response carries an `X-Request-Id` header.",
@@ -1038,6 +2108,26 @@
             },
             "description": "The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON."
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Missing, malformed, invalid, or expired bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Authenticated, but your role lacks `catalog:write` (`INSUFFICIENT_PERMISSION`)."
+          },
           "500": {
             "content": {
               "application/json": {
@@ -1059,6 +2149,11 @@
             "description": "The database is unreachable. Safe to retry; see the Retry-After header."
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Create a product",
         "tags": [
           "Catalog"
@@ -1113,6 +2208,26 @@
             },
             "description": "The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON."
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Missing, malformed, invalid, or expired bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Authenticated, but your role lacks `catalog:write` (`INSUFFICIENT_PERMISSION`)."
+          },
           "404": {
             "content": {
               "application/json": {
@@ -1144,6 +2259,11 @@
             "description": "The database is unreachable. Safe to retry; see the Retry-After header."
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Archive a product",
         "tags": [
           "Catalog"
@@ -1289,6 +2409,26 @@
             },
             "description": "The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON."
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Missing, malformed, invalid, or expired bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Authenticated, but your role lacks `catalog:write` (`INSUFFICIENT_PERMISSION`)."
+          },
           "404": {
             "content": {
               "application/json": {
@@ -1320,6 +2460,11 @@
             "description": "The database is unreachable. Safe to retry; see the Retry-After header."
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Partially update a product",
         "tags": [
           "Catalog"
@@ -1467,6 +2612,26 @@
             },
             "description": "The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON."
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Missing, malformed, invalid, or expired bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Authenticated, but your role lacks `catalog:write` (`INSUFFICIENT_PERMISSION`)."
+          },
           "404": {
             "content": {
               "application/json": {
@@ -1508,6 +2673,11 @@
             "description": "The database is unreachable. Safe to retry; see the Retry-After header."
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Create a variant",
         "tags": [
           "Catalog"
@@ -1562,6 +2732,26 @@
             },
             "description": "The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON."
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Missing, malformed, invalid, or expired bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Authenticated, but your role lacks `catalog:write` (`INSUFFICIENT_PERMISSION`)."
+          },
           "404": {
             "content": {
               "application/json": {
@@ -1593,6 +2783,11 @@
             "description": "The database is unreachable. Safe to retry; see the Retry-After header."
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Archive a variant",
         "tags": [
           "Catalog"
@@ -1738,6 +2933,26 @@
             },
             "description": "The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON."
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Missing, malformed, invalid, or expired bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Authenticated, but your role lacks `catalog:write` (`INSUFFICIENT_PERMISSION`)."
+          },
           "404": {
             "content": {
               "application/json": {
@@ -1779,6 +2994,11 @@
             "description": "The database is unreachable. Safe to retry; see the Retry-After header."
           }
         },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "summary": "Partially update a variant",
         "tags": [
           "Catalog"
@@ -1873,6 +3093,14 @@
     {
       "description": "Liveness, readiness, and the machine-readable contract. Outside the version prefix and outside the response envelope, on purpose.",
       "name": "Platform"
+    },
+    {
+      "description": "Development credential exchange. Not an identity provider — see the operation descriptions for what that means and what it does not give you.",
+      "name": "Authentication"
+    },
+    {
+      "description": "Places inventory is held: warehouses, retail stores, and virtual locations for dropship or in-transit stock.",
+      "name": "Locations"
     },
     {
       "description": "Products and their variants. A product carries merchandising information; a variant is a purchasable unit with a SKU and a price. Inventory and orders reference variants, not products.",

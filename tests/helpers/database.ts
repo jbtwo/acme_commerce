@@ -55,6 +55,13 @@ export function testConfig(): Config {
       DB_SCHEMA: process.env.DB_SCHEMA ?? 'acme',
       DB_POOL_MAX: '5',
       MIGRATE_ON_STARTUP: 'false',
+      // Fixed rather than random so a token signed in one test verifies in another within the
+      // same run, and so a failure is reproducible.
+      AUTH_TOKEN_SECRET: 'integration-test-signing-key-at-least-32-chars',
+      AUTH_TOKEN_TTL_SECONDS: '3600',
+      // High enough that a test suite hammering the token endpoint is not itself rate limited;
+      // the limiter's own behaviour is covered by unit tests and one dedicated integration test.
+      AUTH_RATE_LIMIT_MAX: '1000',
     },
     version: 'test',
   });

@@ -335,6 +335,47 @@ are omitted.
 | `GET`  | `/openapi.json` | `getOpenApiDocument` |
 | `GET`  | `/docs`         | — (Swagger UI)       |
 
+### Authentication — `/api/v1`
+
+| Method | Path                 | `operationId`        | Requires         |
+| ------ | -------------------- | -------------------- | ---------------- |
+| `POST` | `/api/v1/auth/token` | `createToken`        | — (rate limited) |
+| `GET`  | `/api/v1/auth/me`    | `getCurrentIdentity` | any valid token  |
+
+**Seeded development users.** These passwords are fixtures, published deliberately — you cannot
+practise authentication against credentials you do not have.
+
+| Email                  | Role        | Password           |
+| ---------------------- | ----------- | ------------------ |
+| `dev@acme.example`     | `developer` | `dev-password-123` |
+| `support@acme.example` | `support`   | `dev-password-123` |
+| `admin@acme.example`   | `admin`     | `dev-password-123` |
+
+| Permission        | `developer` | `support` | `admin` |
+| ----------------- | ----------- | --------- | ------- |
+| `catalog:read`    | ✅          | ✅        | ✅      |
+| `catalog:write`   | ✅          | —         | ✅      |
+| `locations:read`  | ✅          | ✅        | ✅      |
+| `locations:write` | ✅          | —         | ✅      |
+| `inventory:read`  | ✅          | ✅        | ✅      |
+| `inventory:write` | ✅          | —         | ✅      |
+| `pricing:read`    | ✅          | ✅        | ✅      |
+
+`support` is read-only everywhere, which is what makes a `403` reachable against a real identity.
+
+### Locations — `/api/v1`
+
+| Method  | Path                             | `operationId`    | Requires          |
+| ------- | -------------------------------- | ---------------- | ----------------- |
+| `GET`   | `/api/v1/locations`              | `listLocations`  | `locations:read`  |
+| `POST`  | `/api/v1/locations`              | `createLocation` | `locations:write` |
+| `GET`   | `/api/v1/locations/{locationId}` | `getLocation`    | `locations:read`  |
+| `PATCH` | `/api/v1/locations/{locationId}` | `updateLocation` | `locations:write` |
+
+There is no `DELETE`. Inventory levels and the adjustment audit log reference locations, so
+retiring one is `{"is_active": false}` — which is what "delete this warehouse" means in a
+business that has shipped from it.
+
 ### Catalog — `/api/v1`
 
 | Method   | Path                                    | `operationId`         | Success            |
@@ -350,7 +391,8 @@ are omitted.
 | `PATCH`  | `/api/v1/variants/{variantId}`          | `updateVariant`       | `200`              |
 | `DELETE` | `/api/v1/variants/{variantId}`          | `archiveVariant`      | `200` (archives)   |
 
-**No authentication in Milestone 1.** Every endpoint above is open, including the writes.
+**Catalog reads are open; writes require `catalog:write`.** A storefront browses the catalog
+without credentials. Everything that writes needs a bearer token.
 
 ### `GET /api/v1/products` query parameters
 

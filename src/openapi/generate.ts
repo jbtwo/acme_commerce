@@ -58,6 +58,15 @@ function specConfig(): Config {
       connectTimeoutMs: 1000,
       statementTimeoutMs: 1000,
     },
+    auth: {
+      // A fixed placeholder, never used to sign anything: generating the spec boots the app
+      // but issues no tokens. Hard-coded rather than read from the environment for the same
+      // reason as everything else here — the generated document must not vary by machine.
+      tokenSecret: 'spec-generation-placeholder-not-a-real-signing-key',
+      tokenTtlSeconds: 3600,
+      rateLimitMax: 10,
+      rateLimitWindowSeconds: 60,
+    },
     testDatabaseUrl: undefined,
     version: APP_VERSION,
   };

@@ -30,6 +30,8 @@ import { randomBytes } from 'node:crypto';
 export const ID_PREFIXES = {
   product: 'prod',
   variant: 'var',
+  user: 'usr',
+  location: 'loc',
   request: 'req',
 } as const;
 
@@ -82,4 +84,6 @@ export function timestampFromId(kind: ResourceKind, value: string): Date | null 
 
 export const productId = () => generateId('product');
 export const variantId = () => generateId('variant');
+export const userId = () => generateId('user');
+export const locationId = () => generateId('location');
 export const requestId = () => generateId('request');

@@ -12,6 +12,7 @@
 import { Type } from '@sinclair/typebox';
 import type { FastifyInstance, FastifySchema } from 'fastify';
 import { collection, resource } from '../../http/envelope.js';
+import { protectedBy } from '../../http/authorize.js';
 import * as service from './service.js';
 import {
   ProductIdParams,
@@ -52,6 +53,15 @@ const CorrelationHeaders = Type.Object(
   },
   { additionalProperties: true },
 );
+
+/** Declared on every write operation. Catalog reads are deliberately unauthenticated. */
+const security = [{ bearerAuth: [] }];
+
+/** Error responses every write operation can produce, on top of the shared read set. */
+const WRITE_ERRORS = {
+  401: 'Missing, malformed, invalid, or expired bearer token.',
+  403: 'Authenticated, but your role lacks `catalog:write` (`INSUFFICIENT_PERMISSION`).',
+} as const;
 
 /** Error responses shared by every operation, so the contract is complete rather than optimistic. */
 function errorResponses(extra: Record<number, string> = {}): Record<number, unknown> {
@@ -122,8 +132,10 @@ export async function registerCatalogRoutes(app: FastifyInstance): Promise<void>
   app.post<{ Body: CreateProductInput }>(
     '/products',
     {
+      onRequest: protectedBy(app, 'catalog:write'),
       schema: {
         operationId: 'createProduct',
+        security,
         summary: 'Create a product',
         description: [
           'Creates a product. The identifier, timestamps, and archive state are assigned by the',
@@ -142,7 +154,7 @@ export async function registerCatalogRoutes(app: FastifyInstance): Promise<void>
         headers: CorrelationHeaders,
         response: {
           201: { ...ref('ProductResponse'), description: 'The product that was created.' },
-          ...errorResponses(),
+          ...errorResponses(WRITE_ERRORS),
         },
       },
     },
@@ -185,8 +197,10 @@ export async function registerCatalogRoutes(app: FastifyInstance): Promise<void>
   app.patch<{ Params: ProductIdParamsType; Body: UpdateProductInput }>(
     '/products/:productId',
     {
+      onRequest: protectedBy(app, 'catalog:write'),
       schema: {
         operationId: 'updateProduct',
+        security,
         summary: 'Partially update a product',
         description: [
           'Updates only the properties present in the body.',
@@ -208,6 +222,7 @@ export async function registerCatalogRoutes(app: FastifyInstance): Promise<void>
         response: {
           200: { ...ref('ProductResponse'), description: 'The product after the update.' },
           ...errorResponses({
+            ...WRITE_ERRORS,
             404: 'No product exists with that identifier (`PRODUCT_NOT_FOUND`).',
           }),
         },
@@ -220,8 +235,10 @@ export async function registerCatalogRoutes(app: FastifyInstance): Promise<void>
   app.delete<{ Params: ProductIdParamsType }>(
     '/products/:productId',
     {
+      onRequest: protectedBy(app, 'catalog:write'),
       schema: {
         operationId: 'archiveProduct',
+        security,
         summary: 'Archive a product',
         description: [
           '**Archives the product; it is not destroyed.** Status becomes `archived`,',
@@ -247,6 +264,7 @@ export async function registerCatalogRoutes(app: FastifyInstance): Promise<void>
             description: 'The archived product. Returned for a repeat call too.',
           },
           ...errorResponses({
+            ...WRITE_ERRORS,
             404: 'No product exists with that identifier (`PRODUCT_NOT_FOUND`).',
           }),
         },
@@ -297,8 +315,10 @@ export async function registerCatalogRoutes(app: FastifyInstance): Promise<void>
   app.post<{ Params: ProductIdParamsType; Body: CreateVariantInput }>(
     '/products/:productId/variants',
     {
+      onRequest: protectedBy(app, 'catalog:write'),
       schema: {
         operationId: 'createVariant',
+        security,
         summary: 'Create a variant',
         description: [
           'Adds a variant to the product named in the path. The parent is taken from the URL,',
@@ -320,6 +340,8 @@ export async function registerCatalogRoutes(app: FastifyInstance): Promise<void>
         response: {
           201: { ...ref('VariantResponse'), description: 'The variant that was created.' },
           ...errorResponses({
+            ...WRITE_ERRORS,
+            ...WRITE_ERRORS,
             404: 'No product exists with that identifier (`PRODUCT_NOT_FOUND`).',
             409: 'A variant with that SKU already exists (`SKU_ALREADY_EXISTS`).',
           }),
@@ -360,8 +382,10 @@ export async function registerCatalogRoutes(app: FastifyInstance): Promise<void>
   app.patch<{ Params: VariantIdParamsType; Body: UpdateVariantInput }>(
     '/variants/:variantId',
     {
+      onRequest: protectedBy(app, 'catalog:write'),
       schema: {
         operationId: 'updateVariant',
+        security,
         summary: 'Partially update a variant',
         description:
           'Updates only the properties present in the body, with the same omitted-versus-null ' +
@@ -374,6 +398,8 @@ export async function registerCatalogRoutes(app: FastifyInstance): Promise<void>
         response: {
           200: { ...ref('VariantResponse'), description: 'The variant after the update.' },
           ...errorResponses({
+            ...WRITE_ERRORS,
+            ...WRITE_ERRORS,
             404: 'No variant exists with that identifier (`VARIANT_NOT_FOUND`).',
             409: 'Another variant already uses that SKU (`SKU_ALREADY_EXISTS`).',
           }),
@@ -387,8 +413,10 @@ export async function registerCatalogRoutes(app: FastifyInstance): Promise<void>
   app.delete<{ Params: VariantIdParamsType }>(
     '/variants/:variantId',
     {
+      onRequest: protectedBy(app, 'catalog:write'),
       schema: {
         operationId: 'archiveVariant',
+        security,
         summary: 'Archive a variant',
         description:
           'Archives the variant; it is not destroyed. Same rationale and same idempotency as ' +
@@ -403,6 +431,7 @@ export async function registerCatalogRoutes(app: FastifyInstance): Promise<void>
             description: 'The archived variant. Returned for a repeat call too.',
           },
           ...errorResponses({
+            ...WRITE_ERRORS,
             404: 'No variant exists with that identifier (`VARIANT_NOT_FOUND`).',
           }),
         },

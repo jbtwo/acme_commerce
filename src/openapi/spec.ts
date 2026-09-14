@@ -74,9 +74,27 @@ shape depends on the code.
 
 ## Authentication
 
-**None in Milestone 1.** Every endpoint here is open. Bearer tokens and roles arrive in
-Milestone 2, and partner API keys in Milestone 4. This is a learning environment; do not
-deploy it anywhere it can be reached from the internet.
+Get a token from \`POST /api/v1/auth/token\` and send it as \`Authorization: Bearer <token>\`.
+
+**Catalog reads are deliberately open.** A storefront browses products without credentials.
+Everything that writes — and all of locations, inventory, and pricing — requires a token.
+
+Three roles, and permissions are what routes actually check:
+
+| Role | Holds |
+|---|---|
+| \`developer\` | every read and write except admin-only actions |
+| \`support\` | **read-only** across every domain |
+| \`admin\` | everything |
+
+\`401\` means the server does not know who you are — send credentials. \`403\` means it knows
+exactly who you are and the answer is still no; retrying with the same token will not help. A
+\`403\` always names the permission it wanted, in \`error.details.required_permission\`.
+\`GET /api/v1/auth/me\` reports the permissions you actually hold.
+
+This is a **development** auth flow, not an identity provider. Tokens cannot be revoked
+individually and seeded passwords are published in the README. Do not deploy this where it can
+be reached from the internet. Partner API keys arrive in Milestone 4.
 `.trim();
 
 export function buildSwaggerOptions(config: Config): SwaggerOptions {
@@ -100,12 +118,42 @@ export function buildSwaggerOptions(config: Config): SwaggerOptions {
           description: 'The server this document was fetched from.',
         },
       ],
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: 'http',
+            scheme: 'bearer',
+            bearerFormat: 'JWT',
+            description:
+              'A development bearer token from `POST /api/v1/auth/token`.\n\n' +
+              'Send it as `Authorization: Bearer <token>`.\n\n' +
+              'The token is a JWT: signed, **not encrypted**. Anyone holding it can read every ' +
+              'claim inside it, so treat it as a credential and keep it out of anything you ' +
+              'commit. It cannot be revoked individually — it is valid until it expires.\n\n' +
+              'Catalog **reads** are deliberately unauthenticated: a storefront browses the ' +
+              'catalog without credentials. Everything that writes, and everything under ' +
+              'locations, inventory, and pricing, requires a token.',
+          },
+        },
+      },
       tags: [
         {
           name: 'Platform',
           description:
             'Liveness, readiness, and the machine-readable contract. Outside the version ' +
             'prefix and outside the response envelope, on purpose.',
+        },
+        {
+          name: 'Authentication',
+          description:
+            'Development credential exchange. Not an identity provider — see the operation ' +
+            'descriptions for what that means and what it does not give you.',
+        },
+        {
+          name: 'Locations',
+          description:
+            'Places inventory is held: warehouses, retail stores, and virtual locations for ' +
+            'dropship or in-transit stock.',
         },
         {
           name: 'Catalog',
