@@ -4,18 +4,33 @@ How API engineering concepts appear in **this** project — what each one is for
 it solves, who cares about it, what artifact represents it, how it fails, and how to explore it
 in Postman.
 
-This guide grows with the build. It currently covers **Milestone 1** only.
+This guide grows with the build. Sequence revised 2026-09-14 — see
+[`docs/CHECKPOINTS.md`](docs/CHECKPOINTS.md), which holds the checkpoint tasks and their
+done-when conditions. This guide explains the concepts; that document says what to do with them.
 
-| Milestone | Topics added                                                                                                                                         |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **1** ✅  | HTTP request anatomy · collection endpoints · API contracts · error design · request correlation · testing levels · environments · mocking (concept) |
-| 2         | Authentication · authorization · roles · scopes · 401 vs 403 · state verification                                                                    |
-| 3         | Idempotency · workflow chaining · dependency failure · state machines                                                                                |
-| 4         | API keys · partner isolation · webhooks · signature verification · retries · duplicate delivery                                                      |
-| 5         | Contract drift · governance · versioning · breaking changes · deprecation · CI/CD                                                                    |
+| Milestone / checkpoint | Topics added                                                                                                                                                                                    |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **M1A** ✅             | _(build — the Catalog API every concept below is explored against)_                                                                                                                             |
+| **CP1** 🔨             | HTTP request anatomy · collection endpoints · API contracts · error design · request correlation · testing levels · environments · **schema assertions · Collection Runner · data-driven runs** |
+| **M2A** ✅             | Authentication · authorization · roles · permissions · 401 vs 403 · token anatomy · local vs shared secrets                                                                                     |
+| **CP2** ⬅              | **The gate** · Spec Hub · governance rules · Postman CLI in CI · exit codes and reporters · deliberate breaking changes · flake · Git-connected workspaces                                      |
+| M3A                    | Idempotency · state machines                                                                                                                                                                    |
+| CP3                    | Package Library · mocks, static and code-based · branching in a run · end-to-end chains                                                                                                         |
+| M4A                    | Webhooks · delivery, retries, signatures                                                                                                                                                        |
+| CP4                    | Monitors · Monitor Runners behind a firewall · alert routing · performance profiles (concept)                                                                                                   |
+| M5A                    | Versioning · deprecation · breaking changes                                                                                                                                                     |
+| M6                     | The Management Plane: API Catalog vs Private API Network · service accounts · the five metrics                                                                                                  |
 
-Topics listed as "not yet" below are placeholders on purpose — a forward reference is more honest
+Topics marked "not yet" below are placeholders on purpose — a forward reference is more honest
 than pretending the subject does not exist.
+
+**One structural note about what follows.** Sections 1 to 8 are the Postman **Activity Plane**:
+requests, environments, variables, assertions, mocks. That is the half of the product that opens
+a conversation, and on its own it invites the description "Postman is where you test APIs" —
+which is both reductive and, for an Enterprise buyer, the wrong pitch. The **Management Plane**
+— API Catalog, governance rules, service accounts, Git-connected workspaces, health scorecards —
+is the half that answers "who is enforcing this across four hundred developers", and it starts
+at §10.
 
 ---
 
@@ -617,6 +632,37 @@ pm.test('carries a correlation id', () =>
 Then write one that fails on purpose, to see what a failure looks like before you need to
 diagnose a real one.
 
+That is day one. Three assertions on `/health` is not expertise, and a QA lead will find the
+floor of it in about ninety seconds. Three things take you past it:
+
+**Assert against the schema, not just the status.** `pm.response.to.have.jsonSchema(schema)`
+takes a JSON Schema object — and you already publish one at `/openapi.json`. Fetch it, pull
+`components.schemas.Product` out of it, and assert a real response against the contract the
+server claims to honour:
+
+```javascript
+const spec = pm.collectionVariables.get('openapi_spec'); // fetched in a pre-request script
+pm.test('matches the published Product schema', () => {
+  pm.response.to.have.jsonSchema(JSON.parse(spec).components.schemas.Product);
+});
+```
+
+What that proves which a status check does not: every property, its type, its nullability, and
+that no undeclared field crept in. What it still does not prove: that the _values_ are right. A
+product with the wrong price passes a schema assertion cleanly.
+
+**Run the collection, not the request.** The Collection Runner does iterations, delay,
+persisting variables, and an exportable result file. That file is what a CI reporter consumes —
+which is the entire bridge from "I ran my tests" to "the pipeline ran my tests", and the subject
+of CP2.
+
+**Drive it from data.** `pm.iterationData.get('sku')` reads a column from a CSV or JSON file, so
+one request becomes N scenarios with one report. The question a QA lead is actually asking is
+never "can you write a test", it is "how do you get from forty tests to four thousand without
+forty thousand lines of maintenance". This is the answer.
+
+Full task list in [`docs/CHECKPOINTS.md`](docs/CHECKPOINTS.md) CP1, groups 5 to 7.
+
 ---
 
 ## 7. Environments
@@ -690,10 +736,32 @@ The corollary catches people out in the other direction too: an **unshared `base
 an empty string**. The collection works perfectly for you and is a shell for everyone else,
 including CI. Configuration should be shared; credentials should not.
 
-That leaves a genuine tension, worth seeing now rather than discovering in Milestone 5: cloud
-runners can only read shared values, so a collection that needs a token in CI cannot simply keep
-it local. The resolution is not to share the token — it is to inject it at run time from a CI
-secret.
+That leaves a genuine tension, and it has a named product answer rather than only a workaround.
+
+Cloud runners can only read shared values, so a collection that needs a credential in CI cannot
+simply keep it local. **Postman Vault** is the mechanism: a **Local Vault** secret is referenced
+as `{{vault:secret-name}}` or `await pm.vault.get('name')`, never syncs anywhere, and is
+therefore invisible to the Postman CLI, monitors, and scheduled runs. A **Shared Vault** secret
+does reach those, at the cost of living in Postman cloud.
+
+|                            | Local Vault | Shared Vault |
+| -------------------------- | ----------- | ------------ |
+| Manual and collection runs | ✅          | ✅           |
+| Postman CLI                | ❌          | ✅           |
+| Monitors, scheduled runs   | ❌          | ✅           |
+| Syncs off your machine     | Never       | Yes          |
+
+The third option, and usually the right one for a real credential, is **not to put it in Postman
+at all**: inject it at run time from whatever already manages secrets for that pipeline —
+`postman collection run --env-var "password=$SECRET"` reading a GitHub secret.
+
+For CI identity specifically the Enterprise answer is a **service account**: a non-human
+identity with its own short-lived token and its own audit trail, so a pipeline is not running as
+a person who might leave the company. That is a Management Plane feature and it is covered in
+§10.
+
+You will hit this concretely at CP2 task 0 — your auth helper currently uses Local Vault, so the
+collection cannot run in CI until you choose one of the three.
 
 Nothing in Milestone 1 needs a credential. The habit belongs in place before the secret does.
 
@@ -713,53 +781,235 @@ instantly is worth thirty seconds now.
 
 ## 8. Mocking
 
-Fully covered in **Milestone 5**, but the concept is worth having early because the _reason_ for
-it appears before the tooling.
+Covered in depth at **CP3**, but the concept is worth having early because the _reason_ for it
+appears before the tooling does.
 
 ### Why the concept exists
 
-A frontend developer needs `GET /api/v1/orders` to exist before the backend has built it. They
-have three options: wait, hard-code fake data into the client and remember to remove it, or
-agree the contract now and develop against a mock of it.
+A frontend developer needs `GET /api/v1/orders` to exist before the backend has built it. Three
+options: wait, hard-code fake data into the client and remember to remove it, or agree the
+contract now and develop against a mock of it.
 
-The third is the only one where both sides make progress and neither has to guess. It requires
-one thing first: **a contract**. Which is why design-first and mocking are the same subject.
+Only the third has both sides making progress and neither guessing. It requires one thing first:
+**a contract**. Which is why design-first and mocking are the same subject.
 
-### How it works in Postman
+### Two kinds, and the difference matters
 
-A mock server returns the **examples** from your collection or OpenAPI document in response to
-matching requests. So the examples in `openapi/openapi.json` are not decoration — they become
-the mock's behaviour. A thin example produces a useless mock, which is a concrete reason to
-write good ones.
+The framing most people carry — "a mock returns your saved examples, has no state, and cannot
+surprise you" — describes only one of the two kinds Postman ships, and describing it as the
+whole picture in 2026 is describing the old product.
 
-### What mocks cannot do
+|                       | Example-based mock           | Code-based local mock                                 |
+| --------------------- | ---------------------------- | ----------------------------------------------------- |
+| Responses             | Static, from saved examples  | Dynamic — any JavaScript                              |
+| Where it runs         | Postman cloud, always on     | Locally, or deployed                                  |
+| State across requests | None                         | Yes, via `pm.state` (beta)                            |
+| Request matching      | Postman's matching algorithm | Your own handler logic                                |
+| In CI                 | Via a collection run         | `postman mock run`, as a dependency of the test suite |
+| Failure simulation    | No                           | Scenarios — latency, errors, rate limits, chaos mode  |
 
-The limitation to be clear about, because it is where mocks mislead:
+An **example-based mock** is built from your collection or OpenAPI examples and always runs in
+Postman's cloud. It is the right tool for stubbing a frontend, and CORS is enabled so a browser
+can call it directly.
 
-- **A mock cannot be wrong in the way the real thing is wrong.** It returns what you told it to.
-  It will not surprise you with a `409`, a timeout, or a validation error you did not anticipate.
-- **It has no state.** Create a product against a mock and it is not there afterwards.
-- **It agrees with the contract by construction.** So it proves nothing about whether the
+A **code-based local mock** is a JavaScript request handler. It can hold state with `pm.state`,
+query datasets with `pm.datasets`, assert with `pm.test` inside the mock itself, and — the part
+that changes the picture — run as a **local dependency of your CI test suite** via
+`postman mock run`, with `postman collection run --mock` pointing at it.
+
+That last capability is why the old framing is now wrong in a way that matters commercially: a
+platform lead asking "can I run contract tests in CI without standing up the real service" has a
+product answer, and it is not "no, mocks are just static examples".
+
+### Your examples become the mock
+
+The examples in `openapi/openapi.json` are not decoration — for an example-based mock they
+_become_ its behaviour. A thin example produces a useless mock, which is a concrete reason to
+write good ones. This project's contract tests already assert that the documented `ProductCreate`
+and `VariantCreate` examples are accepted by the real API, so they cannot quietly go stale.
+
+### What a mock cannot do
+
+The limitation to be precise about, because it is where mocks mislead:
+
+- **A static mock returns what you told it to.** It will not surprise you with a `409`, a
+  timeout, or a validation error you did not anticipate. A code-based mock _can_ — but only the
+  failures you thought to script.
+- **A mock agrees with the contract by construction.** So it proves nothing about whether the
   implementation agrees.
 
-That last point is the deep one: a mock and a real server can both satisfy a contract and behave
-differently. Comparing the two is how you find contract drift, and it is exactly the
+That second point is the deep one. A mock and a real server can both satisfy a contract and
+behave differently. Comparing the two is how you find contract drift, and it is precisely the
 Milestone 5 exercise.
+
+## 9. Idempotency, webhooks, versioning
+
+Milestones 3, 4 and 5. Listed so the shape of what is coming is visible:
+
+- **Idempotency** (M3A) — why clients retry, why a retried `POST` can duplicate a side effect,
+  how an `Idempotency-Key` makes it safe, and what should happen when the same key arrives with
+  a different payload. You have already met the free case: `DELETE` is idempotent by nature
+  because it asserts a state, and §4 covers why `POST` gets none of that for nothing.
+- **Webhooks** (M4A) — polling versus event delivery, delivery attempts and retries, why
+  at-least-once delivery makes the _consumer's_ idempotency the producer's problem, HMAC
+  signature verification, replay protection, and why ordering is not guaranteed.
+- **Versioning and breaking changes** (M5A) — URL versus header versioning, deprecation windows,
+  expand-then-contract migrations, and how to coordinate a change with a consumer who cannot
+  redeploy on your schedule.
 
 ---
 
-## 9. Idempotency, webhooks, versioning, CI/CD
+## 10. The Management Plane
 
-Milestones 3, 4, and 5. Listed so the shape of what is coming is visible:
+Everything above is the **Activity Plane** — the requests, environments, variables and
+assertions an individual developer touches. It is genuinely most of what people know Postman
+for, and on its own it supports the description "Postman is where you test APIs".
 
-- **Idempotency** (M3) — why clients retry, why a retried `POST` can duplicate a side effect, how
-  an `Idempotency-Key` makes it safe, and what should happen when the same key arrives with a
-  different payload.
-- **Webhooks** (M4) — polling versus event delivery, delivery attempts and retries, why
-  at-least-once delivery means a consumer must be idempotent too, HMAC signature verification,
-  replay protection, and why ordering is not guaranteed.
-- **Versioning and breaking changes** (M5) — URL versus header versioning, deprecation windows,
-  expand-then-contract migrations, and how to coordinate a change with a consumer who cannot
-  redeploy on your schedule.
-- **CI/CD** (M5) — what each pipeline step detects, what it does not prove, and what
-  post-deployment verification adds that CI cannot.
+That description is the problem. It is the pitch for a tool, and it invites the obvious reply:
+_we already have one._ The Management Plane is the part that answers a different question —
+**who is enforcing this across four hundred developers, and how would you know if they stopped?**
+
+Nothing in this repository taught you any of it until now, which was the single largest finding
+of `docs/LEARNING_PLAN_AUDIT.md`. The build gets you Activity Plane depth, and that depth is
+real and necessary. It does not get you here.
+
+### Spec Hub — the contract as a first-class object
+
+You have an OpenAPI document, you drift-check it in CI, and you lint it with Redocly. All of
+that is real. But the spec lives in a git repository, so the only people who can see it are
+people who can clone it.
+
+**Spec Hub** puts the specification in Postman: versioned, linked to the collections generated
+from it, with an **Issues** tab that surfaces problems against it. The property worth
+understanding is the _link_ — change the spec and the collection can follow, so "the collection
+has drifted from the contract" stops being a thing that happens silently.
+
+Exercised at **CP2 tier A, task 1**.
+
+### Governance rules — where lint becomes policy
+
+`redocly.yaml` in this repository is a real governance implementation. It requires an
+`operationId`, a description on every parameter, and a `4xx` on every operation, and
+`.redocly.lint-ignore.yaml` records three reviewed exceptions with reasons rather than switching
+the rule off. That is exactly the right instinct.
+
+A customer will never ask you about Redocly.
+
+The Postman mechanism is: rules configured under **API Catalog → Governance Groups**, applied to
+specs in **Spec Hub**, enforced by the **Postman CLI** in the pipeline, with results reported
+back into the Catalog. The rule library ships Postman's own guidelines plus Zalando and OWASP,
+and supports custom rules and custom functions.
+
+The difference that matters is not the linting. Both lint. The difference is **where the result
+goes**: a Redocly failure is a red line in someone's terminal, and a Postman governance failure
+lands in a Catalog a platform lead can look at across every service without asking anyone.
+
+Governance rules are **Enterprise-gated**, which is the point rather than an inconvenience — it
+is the boundary between a tool a team adopts and a platform an organisation standardises on.
+
+Exercised at **CP2 tier B, tasks 6 and 7**. Confirm your plan first.
+
+### The Postman CLI — and an honest answer about Newman
+
+`postman spec lint <spec>` validates a specification against your governance rules and, with
+`--report-events` (on by default), uploads the result to the API Catalog, where it appears under
+**your service → Test tab → CI Pipeline Runs**.
+
+**Vocabulary trap:** `postman api lint` is the v11 API Builder command and is not supported in
+v12+. Use `postman spec lint`.
+
+On Newman, get this right, because it is a question you will be asked and the lazy answer costs
+you the room. **Newman is not deprecated.** Postman still ships a full Newman documentation tree
+— install, command reference, reporters, Docker, Jenkins — alongside a migration guide. Plenty
+of QA leads run it in Jenkins today, and telling one it is legacy is telling them their pipeline
+is wrong.
+
+The defensible answer is the difference, not a verdict:
+
+|                   | Newman                      | Postman CLI                                      |
+| ----------------- | --------------------------- | ------------------------------------------------ |
+| Source            | Open source, npm            | Closed source, official single binary            |
+| Account           | None required               | Postman API key / `postman login`                |
+| Collection source | Local JSON file             | Postman cloud by ID, or a local file             |
+| Results           | Terminal and reporter files | **Sync back to the app and the API Catalog**     |
+| Spec linting      | No                          | **`postman spec lint` against governance rules** |
+| CI identity       | Personal or file-based      | **Service accounts** (Enterprise)                |
+
+The framing: _"Newman runs the collection. The Postman CLI runs the collection and puts the
+result somewhere your platform team can see it — which is the difference between a test and a
+gate with evidence."_
+
+### Service accounts — CI identity as a security control
+
+A pipeline authenticating as a person is a pipeline that breaks when that person leaves, and an
+audit trail that attributes automated actions to a human. A **service account** is a non-human
+identity with its own short-lived token and its own trail. Enterprise-only, and it is one of the
+proof points a Security or IT buyer asks about unprompted.
+
+The failure modes are specific and worth knowing before you hit them: a personal API key returns
+**401** at token minting rather than a warning; an org-level Admin role still **403s** at
+workspace create without a role on the specific sub-team; and Workspace Management Settings
+allowlists override roles independently, so granting a role does not clear them.
+
+### Git-connected workspaces
+
+You already have this working — `.postman/resources.yaml`, and `postman/` versioned alongside
+the code. What is worth understanding is what it changes: the repository becomes the source of
+truth rather than a place exports get dropped, which is what makes a collection reviewable in a
+pull request like any other artifact.
+
+### API Catalog versus Private API Network
+
+The primary field confusion, and pure vocabulary — five minutes to learn, high cost to get wrong
+in front of a platform team.
+
+- **API Catalog** — the **producer** view. Every API the organisation runs, with health
+  scorecards aggregating test pass rates, spec compliance and gateway metrics.
+- **Private API Network** — the **consumer** view. The internal directory developers search when
+  they want to _use_ an API someone else owns.
+
+One answers "what do we operate and is it healthy". The other answers "does something already
+exist that does this". Read as one feature, they sound redundant; they are not.
+
+### The five metrics
+
+Named in `docs/CHECKPOINTS.md` M6, and worth carrying because they are how the motion is
+measured rather than described: **Package Adoption Rate**, **Gate Coverage × Flake Rate**,
+**Design Escape Rate**, **Mean Time To Detect**, **Change Failure Rate**.
+
+Two of them you will meet directly. You publish a package at CP3 — you cannot speak credibly
+about adoption of a mechanism you have never used. And you deliberately make a test flaky at
+CP2, because the impulse to re-run rather than fix _is_ the muted-gate diagnosis, and Gate
+Coverage × Flake Rate is the number that exposes it.
+
+### What none of this proves
+
+The Management Plane tells you what is being enforced and whether it is working. It does not
+tell you whether the API is any good, whether the tests assert anything meaningful, or whether
+anyone acts on a red scorecard. A governance rule nobody has tuned and a gate everybody bypasses
+produce excellent dashboards.
+
+---
+
+## 11. Performance testing
+
+Concept only in this project, and honestly so: cloud performance runs need VU hours, and your
+team's `perf_test_milli_vuh` is **0**. There is no task to perform here, and a checkpoint with
+an unperformable task is worse than an acknowledged gap.
+
+What to know:
+
+| Profile   | Shape                                 | Answers                                              |
+| --------- | ------------------------------------- | ---------------------------------------------------- |
+| **Fixed** | Constant virtual users for a duration | "Does it hold up at our normal load?"                |
+| **Ramp**  | Users increase steadily               | "Where does it start to degrade?"                    |
+| **Spike** | Sudden jump, then back down           | "Does a flash sale take us down, and do we recover?" |
+| **Peak**  | Ramp to a target, hold, ramp down     | "Will Black Friday break us?"                        |
+
+The distinction that matters in conversation is that these answer _different_ questions rather
+than being sizes of the same test. "Will Black Friday break us" is Peak. "Why did it fall over
+at 3pm" is Ramp — you want the knee of the curve, not a pass or fail.
+
+And the thing performance testing cannot tell you: whether the load profile you modelled
+resembles real traffic. A clean Peak run against the wrong distribution is a confident wrong
+answer.

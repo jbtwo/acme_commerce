@@ -668,7 +668,10 @@ After Checkpoint 1 you should be able to explain, not just perform:
 5. The difference between `400` and `404` for an identifier, and why it is a real design choice.
 6. Why `409` is the right answer to a duplicate SKU, and why a `SELECT` before `INSERT` is not.
 7. What a JSON Schema is, and what changes when it is the validator rather than a description.
-8. How to read an OpenAPI document, import it into Postman, and notice where it lies.
+8. How to read an OpenAPI document, import it into Postman, and notice where it lies — and
+   then, at CP2, put it into **Spec Hub**, generate a collection from it, break the spec, and
+   read the **Issues** tab. The difference between a contract you can read and a contract the
+   platform enforces is the whole of the Management Plane.
 9. What a Postman variable scope is, and why a base URL belongs in an environment.
 10. What a Postman test proves that an integration test does not, and the reverse.
 

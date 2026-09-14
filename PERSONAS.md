@@ -556,6 +556,46 @@ working. Verifying an HMAC signature in a test script against a real delivered p
 
 ---
 
+## Mapping to the five buyer personas
+
+The twelve above are **engineering** personas — who participates in building and running an API,
+and what each of them needs from it. They are the right lens for designing this API.
+
+They are not the lens you are assessed on. A Strategic Solutions Engineer is measured against
+five **buyer** personas, each with its own proof points and its own demo ordering. The two sets
+overlap without matching, and conflating them is how a demo ends up technically excellent and
+commercially aimed at nobody.
+
+| Buyer persona                                 | Wants                                                              | Engineering personas above that feed it                                  | First proof points                                                                                     |
+| --------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| **Platform Engineering / DevEx / API CoE**    | Centralise API assets, cut tool sprawl, enforce standards at scale | API platform owner · Platform engineer · DevOps                          | Private API Network → governance rules → Domain Capture → SCIM → Spec Hub                              |
+| **Security / IT Administration**              | Control access, prove compliance, eliminate shadow usage           | Security engineer · Platform engineer                                    | SSO/SCIM → Domain Capture → audit log export → Secret Scanner → Vault → service accounts for CI        |
+| **QA Engineering / Test Automation Lead**     | More coverage, fewer escaped defects, shift left                   | QA engineer · Backend developer                                          | Agent Mode test generation → Collection Runner with data files → Postman CLI in CI → results dashboard |
+| **Product Engineering / Engineering Manager** | Faster delivery, fewer handoffs, cleaner collaboration             | Engineering manager · Frontend developer · Backend developer             | Shared workspace → mock server → environments → Git sync → Agent Mode                                  |
+| **Partner / API Product Owners**              | Onboard external developers faster, manage public APIs             | Partner integration developer · External API consumer · Technical writer | Partner Workspaces → Public Workspace → PAN → auto-published documentation                             |
+
+Three things worth noticing about that mapping.
+
+**It is not one-to-one, and the gaps are informative.** The support engineer — arguably the
+persona this API's error design serves best — has no buyer column. Support pain is a symptom you
+surface in discovery, not a budget line. Conversely, Security/IT has almost no representation in
+the engineering set, because a CISO does not participate in building the API at all; they
+participate in governing who can reach it.
+
+**The proof points are mostly Management Plane.** Read down the "first proof points" column:
+PAN, governance rules, SCIM, Domain Capture, audit logs, service accounts, Partner Workspaces.
+Almost none of it is the Activity Plane this project has taught you so far — which is precisely
+the finding in `docs/LEARNING_PLAN_AUDIT.md` and the reason for `LEARNING_GUIDE.md` §10.
+
+**The QA lead is the one you can already serve.** Everything in that row is reachable from the
+work you have done: the Runner, data files, the CLI in CI. That is CP1 and CP2, and it is why
+they come first.
+
+Full proof-point tables and demo ordering are in `POSTMAN_CONTEXT.md` under "Buyer Personas and
+Proof Points". Learn those five; this document stays as the engineering lens it is.
+
+---
+
 ## Cross-cutting: what every persona needs
 
 Five things come up in nearly every entry above. They are worth naming, because they are

@@ -9,3 +9,10 @@ package-lock.json
 # would obscure the changes you actually made to a request.
 postman/
 .postman/
+
+# Process documents you author and regenerate, not project documentation. Left alone so
+# Prettier does not rewrite your prose on every commit. LEARNING_PLAN_AUDIT.md additionally
+# cannot be formatted idempotently — Prettier rewrites it on every pass, so `format:check`
+# would fail on it forever.
+docs/LEARNING_PLAN_AUDIT.md
+docs/REVISION_PROMPT.md

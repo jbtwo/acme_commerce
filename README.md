@@ -645,52 +645,73 @@ Both were exercised locally. Neither has been run on an actual Unraid server —
 
 ## 18. Milestone status
 
-| Milestone        | Scope                                           | Status                |
-| ---------------- | ----------------------------------------------- | --------------------- |
-| **1A**           | Foundation + Catalog API                        | ✅ Built and verified |
-| **1** checkpoint | **You build the first Postman collection**      | ⬅ **Current**         |
-| 2A               | Auth, Locations, Inventory, Pricing             | Not started           |
-| 3A               | Customers, Orders, Fulfillment                  | Not started           |
-| 4A               | Partner API, Webhooks                           | Not started           |
-| 5A               | Contract validation, governance, versioning, CI | Not started           |
-| 6                | Complete learning platform                      | Not started           |
+| #       | Scope                                | Type       | Status                        |
+| ------- | ------------------------------------ | ---------- | ----------------------------- |
+| **M1A** | Foundation and Catalog API           | Build      | ✅ Built, verified, deployed  |
+| **CP1** | Collection and testing depth         | Checkpoint | 🔨 Groups 1–4 done, 5–7 added |
+| **M2A** | Auth, Locations, Inventory, Pricing  | Build      | ✅ Built and verified         |
+| **CP2** | **Gate** — Spec Hub, governance, CI  | Checkpoint | ⬅ **Current**                 |
+| **M3A** | Idempotency and one state machine    | Build      | Not started                   |
+| **CP3** | Validate — packages, mocks, chaining | Checkpoint | Not started                   |
+| **M4A** | Webhooks                             | Build      | Not started                   |
+| **CP4** | Monitor — monitors, Monitor Runners  | Checkpoint | Not started                   |
+| **M5A** | Versioning and deprecation           | Build      | Not started                   |
+| **M6**  | Management Plane                     | Non-build  | Not started                   |
 
-### Current checkpoint: STOP AND LEARN 2 — Authentication, Inventory, Pricing
+Sequence revised 2026-09-14 against [`docs/LEARNING_PLAN_AUDIT.md`](docs/LEARNING_PLAN_AUDIT.md).
+The audit found the original ordering put governance, contract validation and CI **last** —
+behind four milestones of ecommerce domain modelling — when the gate is the centre of the motion
+being measured. CP2 moved from Milestone 5 to immediately after 2A; 3A and 4A were compressed to
+the concepts that carry their weight.
 
-The Catalog API is built and independently verified. Evidence, exact commands, and observed
-output are in [`docs/BUILD_VERIFICATION.md`](docs/BUILD_VERIFICATION.md).
+Checkpoint tasks and done-when conditions live in
+[`docs/CHECKPOINTS.md`](docs/CHECKPOINTS.md).
 
-**Next: you build your first Postman collection, by hand.** Nothing in `postman/` is generated.
-[`LEARNING_GUIDE.md`](LEARNING_GUIDE.md) §7 covers variable scopes and the local-versus-shared
-value distinction that keeps credentials out of the repository.
+### Current checkpoint: CP2 — Gate
 
-What you need:
+Milestone 2A is built and verified — evidence in
+[`docs/BUILD_VERIFICATION.md`](docs/BUILD_VERIFICATION.md).
 
-|                | Value                                                   |
-| -------------- | ------------------------------------------------------- |
-| Base URL       | `http://127.0.0.1:3000`                                 |
-| OpenAPI        | `http://127.0.0.1:3000/openapi.json`                    |
-| Swagger UI     | `http://127.0.0.1:3000/docs`                            |
-| Authentication | **None** in Milestone 1                                 |
-| Seeded catalog | 20 products, 49 variants                                |
-| Prerequisites  | `./scripts/dev-postgres.sh` running, then `npm run dev` |
+**Next: turn a collection you run into a gate that runs itself and blocks a merge.** Spec Hub,
+governance rules, the Postman CLI in CI, a deliberate breaking change, and a deliberately flaky
+test. Full task list in [`docs/CHECKPOINTS.md`](docs/CHECKPOINTS.md).
 
-Milestone 2A does not begin until the checkpoint is complete, the Postman assets are exported
-and committed, they have been reviewed, and continuation is explicitly authorised.
+|                |                                                                             |
+| -------------- | --------------------------------------------------------------------------- |
+| Local base URL | `http://127.0.0.1:3000`                                                     |
+| OpenAPI        | `http://127.0.0.1:3000/openapi.json`                                        |
+| Swagger UI     | `http://127.0.0.1:3000/docs`                                                |
+| Seeded logins  | `dev@`, `support@`, `admin@acme.example` — password `dev-password-123`      |
+| Seeded data    | 20 products · 49 variants · 3 locations · 45 stock levels · 6 pricing rules |
+| Prerequisites  | `./scripts/dev-postgres.sh`, then `npm run dev`                             |
 
----
+**Two things to know before starting.**
+
+Your collection **cannot run in CI as it stands**. The auth helper reads the seeded password from
+Postman **Local Vault**, which the Postman CLI cannot see. That is CP2 task 0, and choosing
+between Shared Vault and injecting the credential at run time is the actual lesson rather than an
+obstacle.
+
+**Tier B is Enterprise-gated.** Governance rules and API Catalog require an Enterprise plan —
+confirm under **Team Settings → Plan** before planning around them. Tier A stands entirely on its
+own and is the majority of the value.
+
+Nothing in `postman/` is generated. You build every request, environment, script and test by
+hand; the API is verified first so that when something fails, "the API is broken" is a hypothesis
+to rule out rather than the assumed answer.
 
 ## 19. Documentation index
 
-| Document                                                       | What it is for                                                     |
-| -------------------------------------------------------------- | ------------------------------------------------------------------ |
-| [`docs/MILESTONE_1_PLAN.md`](docs/MILESTONE_1_PLAN.md)         | The plan written **before** the code, for review                   |
-| [`docs/BUILD_VERIFICATION.md`](docs/BUILD_VERIFICATION.md)     | What was verified, how, with observed output — and what was not    |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)                 | Layering, request flow, error handling, observability, deployment  |
-| [`docs/DECISIONS.md`](docs/DECISIONS.md)                       | 22 decisions: what, why, alternatives, costs, whether settled      |
-| [`docs/POSTGRES_SETUP.md`](docs/POSTGRES_SETUP.md)             | SQL, privileges, TLS, pooling, safety, backup, restore             |
-| [`docs/UNRAID_DEPLOYMENT.md`](docs/UNRAID_DEPLOYMENT.md)       | Deployment, both connection models, UI mapping, troubleshooting    |
-| [`docs/DEVELOPMENT_WORKFLOW.md`](docs/DEVELOPMENT_WORKFLOW.md) | The 17-step change lifecycle, and what each step catches           |
-| [`LEARNING_GUIDE.md`](LEARNING_GUIDE.md)                       | API engineering concepts as they appear here. Grows each milestone |
-| [`PERSONAS.md`](PERSONAS.md)                                   | Who participates, what they need, what frustrates them             |
-| [`docs/LEARNING_PLAN_AUDIT.md`](docs/LEARNING_PLAN_AUDIT.md)   | Audit of this plan against Strategic SE / SDLC-automation needs    |
+| Document                                                       | What it is for                                                                       |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| [`docs/MILESTONE_1_PLAN.md`](docs/MILESTONE_1_PLAN.md)         | The plan written **before** the code, for review                                     |
+| [`docs/BUILD_VERIFICATION.md`](docs/BUILD_VERIFICATION.md)     | What was verified, how, with observed output — and what was not                      |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)                 | Layering, request flow, error handling, observability, deployment                    |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md)                       | 22 decisions: what, why, alternatives, costs, whether settled                        |
+| [`docs/POSTGRES_SETUP.md`](docs/POSTGRES_SETUP.md)             | SQL, privileges, TLS, pooling, safety, backup, restore                               |
+| [`docs/UNRAID_DEPLOYMENT.md`](docs/UNRAID_DEPLOYMENT.md)       | Deployment, both connection models, UI mapping, troubleshooting                      |
+| [`docs/DEVELOPMENT_WORKFLOW.md`](docs/DEVELOPMENT_WORKFLOW.md) | The 17-step change lifecycle, and what each step catches                             |
+| [`docs/CHECKPOINTS.md`](docs/CHECKPOINTS.md)                   | **What you do with the API** — checkpoint tasks and done-when conditions             |
+| [`docs/LEARNING_PLAN_AUDIT.md`](docs/LEARNING_PLAN_AUDIT.md)   | SE-readiness audit of this curriculum; the specification for the 2026-09-14 revision |
+| [`LEARNING_GUIDE.md`](LEARNING_GUIDE.md)                       | API engineering concepts, Activity Plane through Management Plane                    |
+| [`PERSONAS.md`](PERSONAS.md)                                   | Who participates, what they need, what frustrates them                               |
