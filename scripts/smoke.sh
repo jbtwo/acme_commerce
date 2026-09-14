@@ -269,6 +269,119 @@ request GET "${API}/locations/loc_00000000000000000000dead"
 expect_error_code 'unknown location' 404 'LOCATION_NOT_FOUND'
 
 # ===========================================================================
+section '2e. Inventory'
+# ===========================================================================
+request GET "${API}/locations?q=Toronto"
+TORONTO_ID="$(printf '%s' "$LAST_BODY" | jget 'data.0.id')"
+
+request GET "${API}/inventory?limit=5"
+expect_status 'GET /inventory' 200
+inv_total="$(printf '%s' "$LAST_BODY" | jget 'pagination.total')"
+if [[ "$inv_total" -ge 40 ]]; then ok "seeded stock levels present ($inv_total)"
+else bad 'seeded stock levels' "total=$inv_total"; fi
+
+request GET "${API}/inventory?available_below=5&limit=50"
+expect_status 'GET /inventory?available_below=5 (low stock)' 200
+low_ok="$(printf '%s' "$LAST_BODY" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)['data']
+print('yes' if d and all(l['available'] < 5 for l in d) else 'no')")"
+if [[ "$low_ok" == 'yes' ]]; then ok 'low-stock filter uses computed availability'
+else bad 'low-stock filter' 'returned a level with available >= 5'; fi
+
+request GET "${API}/inventory/ACME-BAG-BLK"
+expect_status 'GET /inventory/{sku}' 200
+recon="$(printf '%s' "$LAST_BODY" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)['data']
+ok = d['totals']['on_hand'] == sum(l['on_hand'] for l in d['locations'])
+ok = ok and d['totals']['available'] == d['totals']['on_hand'] - d['totals']['reserved']
+print('yes' if ok else 'no')")"
+if [[ "$recon" == 'yes' ]]; then ok 'totals reconcile with the per-location breakdown'
+else bad 'totals reconcile' 'sum mismatch'; fi
+
+request GET "${API}/inventory/NO-SUCH-SKU"
+expect_error_code 'unknown SKU' 404 'VARIANT_NOT_FOUND'
+
+request GET "${API}/inventory/CSC-ANRK-YEL-M"
+expect_error_code 'SKU exists but is not inventory-tracked' 404 'INVENTORY_ITEM_NOT_FOUND'
+
+request POST "${API}/inventory/adjustments" "{\"sku\":\"ACME-LAMP-350\",\"location_id\":\"${TORONTO_ID}\",\"quantity_delta\":25,\"reason\":\"received\",\"reference\":\"SMOKE-${RUN_ID}\"}"
+expect_status 'POST /inventory/adjustments' 201
+expect_field 'actor taken from the token, not the body' 'data.adjustment.actor' 'dev@acme.example'
+
+request POST "${API}/inventory/adjustments" "{\"sku\":\"ACME-LAMP-350\",\"location_id\":\"${TORONTO_ID}\",\"quantity_delta\":-999999,\"reason\":\"correction\"}"
+expect_error_code 'cannot drive stock below zero' 409 'INVENTORY_INSUFFICIENT'
+
+request POST "${API}/inventory/adjustments" "{\"sku\":\"ACME-LAMP-350\",\"location_id\":\"${TORONTO_ID}\",\"quantity_delta\":0,\"reason\":\"correction\"}"
+expect_error_code 'zero-delta adjustment' 400 'VALIDATION_ERROR'
+
+request GET "${API}/inventory/history?sku=ACME-LAMP-350&limit=10"
+expect_status 'GET /inventory/history' 200
+
+request POST "${API}/inventory/reservations" "{\"sku\":\"ACME-LAMP-350\",\"location_id\":\"${TORONTO_ID}\",\"quantity\":3,\"reference\":\"smoke-${RUN_ID}\"}"
+expect_status 'POST /inventory/reservations' 201
+RES_ID="$(printf '%s' "$LAST_BODY" | jget 'data.id')"
+expect_field 'reservation is active' 'data.status' 'active'
+
+request GET "${API}/inventory/reservations/${RES_ID}"
+expect_status 'GET /inventory/reservations/{id}' 200
+
+request POST "${API}/inventory/reservations" "{\"sku\":\"ACME-LAMP-350\",\"location_id\":\"${TORONTO_ID}\",\"quantity\":99999}"
+expect_error_code 'reserving more than is available' 409 'INVENTORY_INSUFFICIENT'
+avail="$(printf '%s' "$LAST_BODY" | jget 'error.details.available')"
+if [[ -n "$avail" ]]; then ok "409 reports the authoritative available quantity ($avail)"
+else bad '409 reports available' 'missing error.details.available'; fi
+
+request POST "${API}/inventory/reservations/${RES_ID}/release" ''
+expect_status 'POST /inventory/reservations/{id}/release' 200
+expect_field 'reservation released' 'data.status' 'released'
+
+request POST "${API}/inventory/reservations/${RES_ID}/release" ''
+expect_status 'release is idempotent' 200
+
+request GET "${API}/inventory/reservations/invres_00000000000000000000dead"
+expect_error_code 'unknown reservation' 404 'RESERVATION_NOT_FOUND'
+
+# ===========================================================================
+section '2f. Pricing'
+# ===========================================================================
+request GET "${API}/pricing/ACME-BAG-BLK"
+expect_status 'GET /pricing/{sku}' 200
+expect_field 'base price' 'data.base_price_cents' '12900'
+expect_field 'autumn sale applied' 'data.effective_unit_price_cents' '10965'
+
+request GET "${API}/pricing/ACME-BAG-BLK?quantity=10"
+expect_status 'GET /pricing with a quantity break' 200
+expect_field 'discounts compound rather than sum' 'data.effective_unit_price_cents' '10417'
+expect_field 'total is unit x quantity' 'data.total_price_cents' '104170'
+
+recon="$(printf '%s' "$LAST_BODY" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)['data']
+print('yes' if d['base_price_cents'] + sum(a['amount_cents'] for a in d['adjustments']) == d['effective_unit_price_cents'] else 'no')")"
+if [[ "$recon" == 'yes' ]]; then ok 'adjustments sum exactly to the effective price'
+else bad 'price breakdown reconciles' 'sum mismatch'; fi
+
+skipped="$(printf '%s' "$LAST_BODY" | python3 -c "
+import json,sys
+d=json.load(sys.stdin)['data']['adjustments']
+s=[a for a in d if not a['applied']]
+print('yes' if s and all(a['skipped_reason'] for a in s) else 'no')")"
+if [[ "$skipped" == 'yes' ]]; then ok 'rules that did not apply are reported with a reason'
+else bad 'skipped rules explained' 'a skipped rule had no reason'; fi
+
+request GET "${API}/pricing/ACME-BAG-BLK?quantity=10&customer_id=customer_wholesale_001"
+expect_status 'GET /pricing with a customer group' 200
+expect_field 'wholesale tier applied' 'data.effective_unit_price_cents' '9375'
+
+request GET "${API}/pricing/ACME-BAG-BLK?currency=USD"
+expect_error_code 'refuses to convert currency' 404 'PRICING_UNAVAILABLE'
+
+request GET "${API}/pricing/NO-SUCH-SKU"
+expect_error_code 'unknown SKU' 404 'VARIANT_NOT_FOUND'
+
+# ===========================================================================
 section '3. Request correlation'
 # ===========================================================================
 request GET "${BASE_URL}/health" '' -H 'X-Request-Id: smoke-test-correlation-42'

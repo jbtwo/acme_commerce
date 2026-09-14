@@ -254,7 +254,14 @@ describe('403 — the support role against every write endpoint', () => {
   });
 
   it('lets the same support token through on every read', async () => {
-    for (const url of ['/api/v1/products', '/api/v1/locations', '/api/v1/auth/me']) {
+    for (const url of [
+      '/api/v1/products',
+      '/api/v1/locations',
+      '/api/v1/auth/me',
+      '/api/v1/inventory',
+      '/api/v1/inventory/history',
+      '/api/v1/pricing/ACME-BAG-BLK',
+    ]) {
       const res = await h.app.inject({
         method: 'GET',
         url,

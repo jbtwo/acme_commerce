@@ -193,7 +193,8 @@ async function commandSeed(): Promise<void> {
     const summary = await seedDatabase(db);
     console.log(
       `Seeded ${summary.products} products, ${summary.variants} variants, ` +
-        `${summary.users} users, ${summary.locations} locations.`,
+        `${summary.users} users, ${summary.locations} locations, ` +
+        `${summary.inventoryLevels} inventory levels, ${summary.pricingRules} pricing rules.`,
     );
   });
 }
@@ -227,7 +228,8 @@ async function commandReset(argv: string[]): Promise<void> {
     const summary = await seedDatabase(db);
     console.log(
       `  ${summary.products} products, ${summary.variants} variants, ` +
-        `${summary.users} users, ${summary.locations} locations seeded`,
+        `${summary.users} users, ${summary.locations} locations, ` +
+        `${summary.inventoryLevels} levels, ${summary.pricingRules} pricing rules seeded`,
     );
     console.log('\nReset complete.');
   } finally {

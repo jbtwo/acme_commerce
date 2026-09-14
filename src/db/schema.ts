@@ -87,11 +87,91 @@ export interface LocationsTable {
   updated_at: UpdatedAt;
 }
 
+export type AdjustmentReason =
+  'received' | 'sold' | 'damaged' | 'correction' | 'transfer_in' | 'transfer_out' | 'return';
+export type ReservationStatus = 'active' | 'released' | 'expired';
+export type PricingRuleType = 'sale' | 'customer_group' | 'quantity_break' | 'partner';
+export type PricingScopeKind = 'all' | 'product_type' | 'sku';
+export type PricingAdjustmentKind = 'percentage' | 'fixed_amount';
+
+export interface InventoryItemsTable {
+  id: string;
+  sku: string;
+  tracked: Generated<boolean>;
+  created_at: CreatedAt;
+  updated_at: UpdatedAt;
+}
+
+export interface InventoryLevelsTable {
+  id: string;
+  inventory_item_id: string;
+  location_id: string;
+  /** Physically present. Never negative. */
+  on_hand: Generated<number>;
+  /**
+   * Held by active reservations. Never negative, never above `on_hand`.
+   * `available` is not a column — it is `on_hand - reserved`, computed at read time.
+   */
+  reserved: Generated<number>;
+  created_at: CreatedAt;
+  updated_at: UpdatedAt;
+}
+
+export interface InventoryAdjustmentsTable {
+  id: string;
+  inventory_item_id: string;
+  location_id: string;
+  quantity_delta: number;
+  reason: AdjustmentReason;
+  reference: string | null;
+  actor: string;
+  created_at: CreatedAt;
+}
+
+export interface InventoryReservationsTable {
+  id: string;
+  inventory_item_id: string;
+  location_id: string;
+  quantity: number;
+  status: Generated<ReservationStatus>;
+  reference: string | null;
+  actor: string;
+  expires_at: ColumnType<Date, Date | string, Date | string>;
+  released_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  created_at: CreatedAt;
+  updated_at: UpdatedAt;
+}
+
+export interface PricingRulesTable {
+  id: string;
+  name: string;
+  type: PricingRuleType;
+  scope_kind: Generated<PricingScopeKind>;
+  scope_value: string | null;
+  adjustment_kind: PricingAdjustmentKind;
+  /** Basis points for `percentage` (-1500 = 15% off), minor units for `fixed_amount`. */
+  adjustment_value: number;
+  min_quantity: number | null;
+  customer_group: string | null;
+  partner_id: string | null;
+  priority: Generated<number>;
+  starts_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  ends_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  is_active: Generated<boolean>;
+  created_at: CreatedAt;
+  updated_at: UpdatedAt;
+}
+
 export interface Database {
   products: ProductsTable;
   variants: VariantsTable;
   users: UsersTable;
   locations: LocationsTable;
+  inventory_items: InventoryItemsTable;
+  inventory_levels: InventoryLevelsTable;
+  inventory_adjustments: InventoryAdjustmentsTable;
+  inventory_reservations: InventoryReservationsTable;
+  pricing_rules: PricingRulesTable;
 }
 
 export type ProductRow = Selectable<ProductsTable>;
@@ -103,6 +183,17 @@ export type NewUserRow = Insertable<UsersTable>;
 export type LocationRow = Selectable<LocationsTable>;
 export type NewLocationRow = Insertable<LocationsTable>;
 export type LocationUpdate = Updateable<LocationsTable>;
+
+export type InventoryItemRow = Selectable<InventoryItemsTable>;
+export type NewInventoryItemRow = Insertable<InventoryItemsTable>;
+export type InventoryLevelRow = Selectable<InventoryLevelsTable>;
+export type NewInventoryLevelRow = Insertable<InventoryLevelsTable>;
+export type InventoryAdjustmentRow = Selectable<InventoryAdjustmentsTable>;
+export type NewInventoryAdjustmentRow = Insertable<InventoryAdjustmentsTable>;
+export type InventoryReservationRow = Selectable<InventoryReservationsTable>;
+export type NewInventoryReservationRow = Insertable<InventoryReservationsTable>;
+export type PricingRuleRow = Selectable<PricingRulesTable>;
+export type NewPricingRuleRow = Insertable<PricingRulesTable>;
 
 export type VariantRow = Selectable<VariantsTable>;
 export type NewVariantRow = Insertable<VariantsTable>;

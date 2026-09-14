@@ -1,10 +1,23 @@
 $kind: collection
-name: Acme Commerce
 variables:
-  product_id: ""
-  run_sku: ""
-  seed_product_id: prod_7ebf51270d4d3de9f7acad4c
-  variant_id: ""
+  - key: product_id
+    value: ""
+    disabled: false
+  - key: run_sku
+    value: ""
+    disabled: false
+  - key: seed_product_id
+    value: prod_7ebf51270d4d3de9f7acad4c
+    disabled: false
+  - key: variant_id
+    value: ""
+    disabled: false
+  - key: access_token
+    secret: true
+    disabled: false
+  - key: token_expires_at
+    value: ""
+    disabled: false
 scripts:
   - type: http:beforeRequest
     code: |-
@@ -15,4 +28,30 @@ scripts:
       if (!baseUrl) {
         throw new Error(`Environment "${pm.environment.name}" has no base_url set.`);
       }
+
+      const token = pm.collectionVariables.get('access_token');
+      const expiresAt = Number(pm.collectionVariables.get('token_expires_at') || 0);
+
+      // Refresh a minute early — a token that expires mid-run is worse than one fetched twice.
+      if (!token || Date.now() > expiresAt - 60_000) {
+        const password = await pm.vault.get('acme-dev-password');
+
+        pm.sendRequest({
+          url: `${pm.environment.get('base_url')}/api/v1/auth/token`,
+          method: 'POST',
+          header: { 'Content-Type': 'application/json' },
+          body: { mode: 'raw', raw: JSON.stringify({ email: 'dev@acme.example', password }) },
+        }, (err, res) => {
+          if (err || res.code !== 200) {
+            throw new Error(`Could not obtain a token: ${err?.message ?? res.code}`);
+          }
+          const d = res.json().data;
+          pm.collectionVariables.set('access_token', d.access_token);
+          pm.collectionVariables.set('token_expires_at', Date.parse(d.expires_at));
+        });
+      }
     language: text/javascript
+auth:
+  type: bearer
+  credentials:
+    token: "{{access_token}}"

@@ -1,6 +1,120 @@
 {
   "components": {
     "schemas": {
+      "AdjustmentRequest": {
+        "additionalProperties": false,
+        "description": "Increase, decrease, or correct stock at one location.",
+        "example": {
+          "location_id": "loc_...",
+          "quantity_delta": 25,
+          "reason": "received",
+          "reference": "PO-4471",
+          "sku": "ACME-BAG-BLK"
+        },
+        "properties": {
+          "location_id": {
+            "description": "Which location to adjust.",
+            "pattern": "^loc_[0-9a-f]{24}$",
+            "type": "string"
+          },
+          "quantity_delta": {
+            "description": "Signed change. Positive adds, negative removes. Zero is rejected — an adjustment that changes nothing is a client bug, not a no-op worth recording.",
+            "example": 25,
+            "type": "integer"
+          },
+          "reason": {
+            "description": "Required. Closed set so the audit log can be grouped and reported on.",
+            "enum": [
+              "received",
+              "sold",
+              "damaged",
+              "correction",
+              "transfer_in",
+              "transfer_out",
+              "return"
+            ],
+            "type": "string"
+          },
+          "reference": {
+            "description": "Optional PO number, order id, or ticket.",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "sku": {
+            "description": "Stock-keeping unit.",
+            "example": "ACME-BAG-BLK",
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "sku",
+          "location_id",
+          "quantity_delta",
+          "reason"
+        ],
+        "title": "AdjustmentRequest",
+        "type": "object"
+      },
+      "AdjustmentResponse": {
+        "additionalProperties": false,
+        "description": "The adjustment recorded, and the level it produced.",
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "properties": {
+              "adjustment": {
+                "$ref": "#/components/schemas/InventoryAdjustment"
+              },
+              "level": {
+                "additionalProperties": false,
+                "description": "The resulting level, so no follow-up read is needed.",
+                "properties": {
+                  "available": {
+                    "description": "Available after the adjustment.",
+                    "type": "integer"
+                  },
+                  "location_id": {
+                    "description": "The location.",
+                    "type": "string"
+                  },
+                  "on_hand": {
+                    "description": "On hand after the adjustment.",
+                    "type": "integer"
+                  },
+                  "reserved": {
+                    "description": "Reserved after the adjustment.",
+                    "type": "integer"
+                  },
+                  "sku": {
+                    "description": "The SKU.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "sku",
+                  "location_id",
+                  "on_hand",
+                  "reserved",
+                  "available"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "adjustment",
+              "level"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "AdjustmentResponse",
+        "type": "object"
+      },
       "Error": {
         "additionalProperties": false,
         "description": "The single error shape returned by every Acme Commerce API error response.",
@@ -97,6 +211,28 @@
         "title": "HealthResponse",
         "type": "object"
       },
+      "HistoryResponse": {
+        "additionalProperties": false,
+        "description": "A page of inventory adjustments.",
+        "properties": {
+          "data": {
+            "description": "A page of audit-log entries, newest first.",
+            "items": {
+              "$ref": "#/components/schemas/InventoryAdjustment"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "title": "HistoryResponse",
+        "type": "object"
+      },
       "Identity": {
         "additionalProperties": false,
         "description": "The authenticated caller, as the server currently understands them.",
@@ -168,6 +304,221 @@
           "data"
         ],
         "title": "IdentityResponse",
+        "type": "object"
+      },
+      "InventoryAdjustment": {
+        "additionalProperties": false,
+        "description": "One entry in the append-only stock audit log.",
+        "properties": {
+          "actor": {
+            "description": "Who did it — taken from the bearer token, never from the body.",
+            "type": "string"
+          },
+          "created_at": {
+            "description": "When. Append-only; never updated.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "description": "Adjustment identifier.",
+            "pattern": "^invadj_[0-9a-f]{24}$",
+            "type": "string"
+          },
+          "location_id": {
+            "description": "Where.",
+            "type": "string"
+          },
+          "location_name": {
+            "description": "Location name, on history responses.",
+            "type": "string"
+          },
+          "quantity_delta": {
+            "description": "Signed change. Negative removes stock.",
+            "type": "integer"
+          },
+          "reason": {
+            "description": "Why the stock moved. A closed set so history can be grouped.",
+            "enum": [
+              "received",
+              "sold",
+              "damaged",
+              "correction",
+              "transfer_in",
+              "transfer_out",
+              "return"
+            ],
+            "type": "string"
+          },
+          "reference": {
+            "description": "Free-text link to a PO, order, or ticket.",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sku": {
+            "description": "The SKU adjusted.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sku",
+          "location_id",
+          "quantity_delta",
+          "reason",
+          "reference",
+          "actor",
+          "created_at"
+        ],
+        "title": "InventoryAdjustment",
+        "type": "object"
+      },
+      "InventoryLevel": {
+        "additionalProperties": false,
+        "description": "Stock for one SKU at one location.",
+        "properties": {
+          "available": {
+            "description": "What can still be reserved or sold: `on_hand - reserved`. **Computed, never stored** — a third stored number is the first thing to disagree with the other two.",
+            "type": "integer"
+          },
+          "location_id": {
+            "description": "Where the stock is.",
+            "pattern": "^loc_[0-9a-f]{24}$",
+            "type": "string"
+          },
+          "location_name": {
+            "description": "Location name, so a response is readable without a second call.",
+            "type": "string"
+          },
+          "on_hand": {
+            "description": "Units physically present.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "reserved": {
+            "description": "Units held by active reservations.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "sku": {
+            "description": "The SKU this level is for.",
+            "type": "string"
+          },
+          "updated_at": {
+            "description": "When this level last changed.",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sku",
+          "location_id",
+          "location_name",
+          "on_hand",
+          "reserved",
+          "available",
+          "updated_at"
+        ],
+        "title": "InventoryLevel",
+        "type": "object"
+      },
+      "InventoryListResponse": {
+        "additionalProperties": false,
+        "description": "A page of inventory levels.",
+        "properties": {
+          "data": {
+            "description": "A page of stock levels.",
+            "items": {
+              "$ref": "#/components/schemas/InventoryLevel"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "title": "InventoryListResponse",
+        "type": "object"
+      },
+      "InventoryReservation": {
+        "additionalProperties": false,
+        "description": "A temporary hold on stock.",
+        "properties": {
+          "actor": {
+            "description": "Who reserved it.",
+            "type": "string"
+          },
+          "created_at": {
+            "description": "When it was created.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "expires_at": {
+            "description": "After this, the hold lapses and the stock returns.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "description": "Reservation identifier.",
+            "pattern": "^invres_[0-9a-f]{24}$",
+            "type": "string"
+          },
+          "location_id": {
+            "description": "Where the stock is held.",
+            "type": "string"
+          },
+          "quantity": {
+            "description": "Units held.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "reference": {
+            "description": "Free-text link to a cart or order.",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "released_at": {
+            "description": "When it was released or expired. Null while active.",
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sku": {
+            "description": "The SKU held.",
+            "type": "string"
+          },
+          "status": {
+            "description": "Lifecycle state. `expired` is reported as soon as `expires_at` passes, whether or not the stock has been swept back yet.",
+            "enum": [
+              "active",
+              "released",
+              "expired"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sku",
+          "location_id",
+          "quantity",
+          "status",
+          "reference",
+          "actor",
+          "expires_at",
+          "released_at",
+          "created_at"
+        ],
+        "title": "InventoryReservation",
         "type": "object"
       },
       "Location": {
@@ -492,6 +843,120 @@
           "total_pages"
         ],
         "title": "Pagination",
+        "type": "object"
+      },
+      "PriceAdjustment": {
+        "additionalProperties": false,
+        "description": "One pricing rule and what it did.",
+        "properties": {
+          "amount_cents": {
+            "description": "Signed change this rule made to the running subtotal, in minor units. Negative is a discount. Zero when `applied` is false.",
+            "type": "integer"
+          },
+          "applied": {
+            "description": "Whether the rule actually changed the price.",
+            "type": "boolean"
+          },
+          "description": {
+            "description": "Human-readable rule name, safe to show a customer.",
+            "type": "string"
+          },
+          "rule_id": {
+            "description": "The pricing rule considered.",
+            "type": "string"
+          },
+          "skipped_reason": {
+            "description": "Why the rule did not apply. Null when it did. Rules that were considered and skipped are reported deliberately — \"the wholesale discount exists and you did not get it because you sent no customer_id\" is the answer a support engineer needs.",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "type": {
+            "description": "Rule kind: sale, customer_group, quantity_break, or partner.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rule_id",
+          "type",
+          "description",
+          "amount_cents",
+          "applied",
+          "skipped_reason"
+        ],
+        "title": "PriceAdjustment",
+        "type": "object"
+      },
+      "PriceQuote": {
+        "additionalProperties": false,
+        "description": "An effective price with its full derivation. Rules apply in ascending priority, each against the running subtotal rather than the base price — so two 10% discounts compound to 19%, not 20%. Each step rounds to a whole minor unit, half away from zero.",
+        "properties": {
+          "adjustments": {
+            "description": "Every rule considered, in the order applied (ascending priority). Applied and skipped rules are both present.",
+            "items": {
+              "$ref": "#/components/schemas/PriceAdjustment"
+            },
+            "type": "array"
+          },
+          "applied_rule_ids": {
+            "description": "Just the rules that applied, for logging or audit.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "base_price_cents": {
+            "description": "The variant list price before any rule.",
+            "type": "integer"
+          },
+          "currency": {
+            "description": "ISO 4217 code. This API does not convert currencies.",
+            "type": "string"
+          },
+          "effective_unit_price_cents": {
+            "description": "Price for one unit after every applicable rule. Equals `base_price_cents` plus the sum of `amount_cents` — the breakdown always reconciles exactly.",
+            "type": "integer"
+          },
+          "quantity": {
+            "description": "Quantity the quote was calculated for.",
+            "minimum": 1,
+            "type": "integer"
+          },
+          "sku": {
+            "description": "The SKU priced.",
+            "type": "string"
+          },
+          "total_price_cents": {
+            "description": "`effective_unit_price_cents` × `quantity`.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sku",
+          "currency",
+          "quantity",
+          "base_price_cents",
+          "adjustments",
+          "effective_unit_price_cents",
+          "total_price_cents",
+          "applied_rule_ids"
+        ],
+        "title": "PriceQuote",
+        "type": "object"
+      },
+      "PriceQuoteResponse": {
+        "additionalProperties": false,
+        "description": "An effective price and how it was reached.",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PriceQuote"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "PriceQuoteResponse",
         "type": "object"
       },
       "Product": {
@@ -877,6 +1342,137 @@
           "checked_at"
         ],
         "title": "ReadinessResponse",
+        "type": "object"
+      },
+      "ReservationRequest": {
+        "additionalProperties": false,
+        "description": "Hold stock for a pending transaction.",
+        "example": {
+          "location_id": "loc_...",
+          "quantity": 2,
+          "reference": "cart_9931",
+          "sku": "ACME-BAG-BLK",
+          "ttl_seconds": 900
+        },
+        "properties": {
+          "location_id": {
+            "description": "Which location to hold stock at.",
+            "pattern": "^loc_[0-9a-f]{24}$",
+            "type": "string"
+          },
+          "quantity": {
+            "description": "Units to hold. Must be positive.",
+            "maximum": 100000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "reference": {
+            "description": "Optional cart or order reference.",
+            "maxLength": 200,
+            "type": "string"
+          },
+          "sku": {
+            "description": "Stock-keeping unit.",
+            "example": "ACME-BAG-BLK",
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "ttl_seconds": {
+            "default": 900,
+            "description": "How long the hold lasts. Defaults to 15 minutes.",
+            "maximum": 86400,
+            "minimum": 60,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sku",
+          "location_id",
+          "quantity"
+        ],
+        "title": "ReservationRequest",
+        "type": "object"
+      },
+      "ReservationResponse": {
+        "additionalProperties": false,
+        "description": "A single reservation.",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/InventoryReservation"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "ReservationResponse",
+        "type": "object"
+      },
+      "SkuInventory": {
+        "additionalProperties": false,
+        "description": "Availability for one SKU across every location.",
+        "properties": {
+          "locations": {
+            "description": "Per-location breakdown. A location with no stock row for this SKU is absent, not zero.",
+            "items": {
+              "$ref": "#/components/schemas/InventoryLevel"
+            },
+            "type": "array"
+          },
+          "sku": {
+            "description": "The SKU.",
+            "type": "string"
+          },
+          "totals": {
+            "additionalProperties": false,
+            "description": "Network-wide totals.",
+            "properties": {
+              "available": {
+                "description": "Summed across every location.",
+                "type": "integer"
+              },
+              "on_hand": {
+                "description": "Summed across every location.",
+                "type": "integer"
+              },
+              "reserved": {
+                "description": "Summed across every location.",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "on_hand",
+              "reserved",
+              "available"
+            ],
+            "type": "object"
+          },
+          "tracked": {
+            "description": "Whether stock is tracked for this SKU.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sku",
+          "tracked",
+          "totals",
+          "locations"
+        ],
+        "title": "SkuInventory",
+        "type": "object"
+      },
+      "SkuInventoryResponse": {
+        "additionalProperties": false,
+        "description": "Availability for one SKU.",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SkuInventory"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "title": "SkuInventoryResponse",
         "type": "object"
       },
       "TokenRequest": {
@@ -1405,6 +2001,847 @@
         ]
       }
     },
+    "/api/v1/inventory": {
+      "get": {
+        "description": "Paginated stock levels across SKUs and locations.\n\n`available` is `on_hand - reserved`, **computed at read time**. There is no stored\navailability column, because a third stored number is the first thing to disagree\nwith the other two.\n\n`?available_below=5` is the low-stock query — it filters on the computed value, not\non `on_hand`, so stock that is physically present but entirely reserved correctly\ncounts as unavailable.",
+        "operationId": "listInventory",
+        "parameters": [
+          {
+            "description": "One-based page number.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Records per page, max 100.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Exact SKU match.",
+            "in": "query",
+            "name": "sku",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Restrict to one location.",
+            "in": "query",
+            "name": "location_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only levels whose computed availability is strictly below this. The low-stock query a merchandiser actually wants.",
+            "example": 5,
+            "in": "query",
+            "name": "available_below",
+            "required": false,
+            "schema": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Sort field. Allowlisted; `id` breaks ties.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "sku",
+              "enum": [
+                "sku",
+                "available",
+                "on_hand",
+                "updated_at"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Sort direction.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "default": "asc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InventoryListResponse"
+                }
+              }
+            },
+            "description": "A page of stock levels."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The request is malformed (`VALIDATION_ERROR` or `MALFORMED_ID`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Missing, malformed, invalid, or expired bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Authenticated, but your role lacks the required permission."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An unexpected server error."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The database is unreachable. Safe to retry."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "List stock levels",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/adjustments": {
+      "post": {
+        "description": "Applies a signed change to one SKU at one location and records it in the audit log.\n\n`actor` is taken from your bearer token, never from the request body. An audit log a\ncaller can sign someone else's name to is not an audit log.\n\nRefuses to drive `on_hand` below zero, and refuses to drive it below the quantity\nalready `reserved` — both return `409 INVENTORY_INSUFFICIENT` with the current numbers\nso you can see why.\n\nCreates the level row automatically if this is the first stock at that location.",
+        "operationId": "createInventoryAdjustment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdjustmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdjustmentResponse"
+                }
+              }
+            },
+            "description": "The adjustment, and the resulting level."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The request is malformed (`VALIDATION_ERROR` or `MALFORMED_ID`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Missing, malformed, invalid, or expired bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Authenticated, but your role lacks the required permission."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Either no such SKU exists in the catalog (`VARIANT_NOT_FOUND`) or it exists but is not inventory-tracked (`INVENTORY_ITEM_NOT_FOUND`). Deliberately distinct — they need different fixes. Or no such location (`LOCATION_NOT_FOUND`)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The change would leave negative or over-reserved stock (`INVENTORY_INSUFFICIENT`)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An unexpected server error."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The database is unreachable. Safe to retry."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Increase, decrease, or correct stock",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/history": {
+      "get": {
+        "description": "Every adjustment ever made, newest first, filterable by SKU, location, reason, and\ndate range.\n\nThe log is **append-only**: entries are never updated and never deleted. That is what\nmakes it an audit log rather than a cache of current belief — the sum of the deltas\nfor a SKU and location reconciles with its `on_hand`.\n\nNote that seeded fixture stock has no history. Fabricating adjustments for data that\nwas never adjusted would make the log a worse record.",
+        "operationId": "listInventoryHistory",
+        "parameters": [
+          {
+            "description": "One-based page number.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Records per page, max 100.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Exact SKU match.",
+            "in": "query",
+            "name": "sku",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Restrict to one location.",
+            "in": "query",
+            "name": "location_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Restrict to one reason.",
+            "in": "query",
+            "name": "reason",
+            "required": false,
+            "schema": {
+              "enum": [
+                "received",
+                "sold",
+                "damaged",
+                "correction",
+                "transfer_in",
+                "transfer_out",
+                "return"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Inclusive lower bound, RFC 3339.",
+            "in": "query",
+            "name": "created_after",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Inclusive upper bound, RFC 3339.",
+            "in": "query",
+            "name": "created_before",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryResponse"
+                }
+              }
+            },
+            "description": "A page of adjustments."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The request is malformed (`VALIDATION_ERROR` or `MALFORMED_ID`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Missing, malformed, invalid, or expired bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Authenticated, but your role lacks the required permission."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An unexpected server error."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The database is unreachable. Safe to retry."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Retrieve the stock audit log",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/reservations": {
+      "post": {
+        "description": "Holds stock so it cannot be sold twice while a transaction is in flight.\n\n**Two callers cannot both reserve the last unit.** The hold is applied by attempting\nthe update and letting a database constraint arbitrate, not by reading availability\nand then writing. A read-check-write has a race window that only appears under\nconcurrency — which is to say, only in production. Losing that race returns\n`409 INVENTORY_INSUFFICIENT` with the authoritative available quantity.\n\nReservations expire (15 minutes by default). Expired holds are swept back inside the\nnext reservation attempt for the same SKU and location, so lapsed stock frees itself\non next use rather than needing a scheduler.",
+        "operationId": "createInventoryReservation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReservationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationResponse"
+                }
+              }
+            },
+            "description": "The reservation that was created."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The request is malformed (`VALIDATION_ERROR` or `MALFORMED_ID`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Missing, malformed, invalid, or expired bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Authenticated, but your role lacks the required permission."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Either no such SKU exists in the catalog (`VARIANT_NOT_FOUND`) or it exists but is not inventory-tracked (`INVENTORY_ITEM_NOT_FOUND`). Deliberately distinct — they need different fixes. Or no such location (`LOCATION_NOT_FOUND`)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Not enough available stock (`INVENTORY_INSUFFICIENT`). `error.details.available` is authoritative."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An unexpected server error."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The database is unreachable. Safe to retry."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Reserve stock for a pending transaction",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/reservations/{reservationId}": {
+      "get": {
+        "description": "Returns one reservation. A hold whose `expires_at` has passed is reported as `expired` immediately, even if the sweep that returns its stock has not run yet — reporting it as still active would be the worse lie.",
+        "operationId": "getInventoryReservation",
+        "parameters": [
+          {
+            "description": "Reservation identifier as returned by the API.",
+            "in": "path",
+            "name": "reservationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationResponse"
+                }
+              }
+            },
+            "description": "The requested reservation."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The request is malformed (`VALIDATION_ERROR` or `MALFORMED_ID`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Missing, malformed, invalid, or expired bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Authenticated, but your role lacks the required permission."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No such reservation (`RESERVATION_NOT_FOUND`)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An unexpected server error."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The database is unreachable. Safe to retry."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Retrieve a reservation",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/reservations/{reservationId}/release": {
+      "post": {
+        "description": "Returns held stock to available and marks the reservation `released`.\n\n**Idempotent.** Releasing an already-released reservation returns `200` with it\nunchanged, for the same reason archiving a product twice does: \"make sure this is\nreleased\" is a reasonable thing to say twice, especially after a network timeout.\n\nReleasing an **expired** reservation is different and returns `409` — its stock was\nalready reclaimed, so succeeding silently would let you believe you had returned\nstock you had not.",
+        "operationId": "releaseInventoryReservation",
+        "parameters": [
+          {
+            "description": "Reservation identifier as returned by the API.",
+            "in": "path",
+            "name": "reservationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReservationResponse"
+                }
+              }
+            },
+            "description": "The released reservation. Returned for a repeat call too."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The request is malformed (`VALIDATION_ERROR` or `MALFORMED_ID`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Missing, malformed, invalid, or expired bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Authenticated, but your role lacks the required permission."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No such reservation (`RESERVATION_NOT_FOUND`)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The reservation had already expired (`RESERVATION_NOT_ACTIVE`)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An unexpected server error."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The database is unreachable. Safe to retry."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Release a reservation",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
+    "/api/v1/inventory/{sku}": {
+      "get": {
+        "description": "Stock for a single SKU across every location, with network-wide totals.\n\n**The path parameter is a SKU, not an opaque id** — the one place in this API where a\nhuman-meaningful natural key sits in a path, because that is how people refer to\ninventory. The tradeoff: renaming a SKU changes the URL, which an opaque id would\nhave insulated you from.\n\nA location with no stock row for this SKU is absent from `locations` rather than\nreported as zero. Never stocked there and stocked-but-empty are different facts.",
+        "operationId": "getInventoryForSku",
+        "parameters": [
+          {
+            "description": "Stock-keeping unit. Note this is a natural key, not an opaque id.",
+            "in": "path",
+            "name": "sku",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SkuInventoryResponse"
+                }
+              }
+            },
+            "description": "Availability across locations."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The request is malformed (`VALIDATION_ERROR` or `MALFORMED_ID`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Missing, malformed, invalid, or expired bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Authenticated, but your role lacks the required permission."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Either no such SKU exists in the catalog (`VARIANT_NOT_FOUND`) or it exists but is not inventory-tracked (`INVENTORY_ITEM_NOT_FOUND`). Deliberately distinct — they need different fixes."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An unexpected server error."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The database is unreachable. Safe to retry."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Retrieve availability for one SKU",
+        "tags": [
+          "Inventory"
+        ]
+      }
+    },
     "/api/v1/locations": {
       "get": {
         "description": "Paginated, filterable list of the places inventory is held.\n\nWith no `is_active` filter, both active and retired locations are returned — the same\nno-hidden-filter rule as the catalog. The result set is fully determined by the query\nstring.\n\nRequires the `locations:read` permission, which every role has.",
@@ -1877,6 +3314,147 @@
         "summary": "Partially update a location",
         "tags": [
           "Locations"
+        ]
+      }
+    },
+    "/api/v1/pricing/{sku}": {
+      "get": {
+        "description": "Returns the price **and the derivation**, not just a number.\n\nThe response lists every rule considered, in the order applied, with the amount each\ncontributed — and the ones that did **not** apply, with the reason. That last part is\nthe difference between an API a support engineer can answer a question with and one\nthat produces a figure nobody can explain.\n\n**Order and compounding.** Rules apply in ascending `priority`, each against the\nrunning subtotal rather than the base price. Two 10% discounts therefore compound to\n19%, not 20%. A business decision, stated rather than implied.\n\n**Rounding.** Each step rounds to a whole minor unit, half away from zero. Each\nreported `amount_cents` is defined as the difference between the subtotal before and\nafter, so the adjustments always sum exactly to `effective_unit_price_cents`.\n\nRequires `pricing:read` because `?customer_id=` returns customer-specific pricing, and\ncommercial terms are not public.",
+        "operationId": "getEffectivePrice",
+        "parameters": [
+          {
+            "description": "Unlocks customer-group pricing. Until the Customer API arrives in Milestone 3 the group mapping is fixture data: `customer_wholesale_001`, `customer_edu_001`, `customer_retail_001`.",
+            "example": "customer_wholesale_001",
+            "in": "query",
+            "name": "customer_id",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Unlocks partner-specific pricing. No partner rules are seeded yet.",
+            "in": "query",
+            "name": "partner_id",
+            "required": false,
+            "schema": {
+              "maxLength": 64,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Units. Drives quantity-break rules.",
+            "in": "query",
+            "name": "quantity",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "maximum": 1000000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Assert the currency you expect. Mismatching the price's own currency returns 404 rather than converting — a wrong exchange rate silently applied is worse than a refusal.",
+            "in": "query",
+            "name": "currency",
+            "required": false,
+            "schema": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Stock-keeping unit to price.",
+            "in": "path",
+            "name": "sku",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PriceQuoteResponse"
+                }
+              }
+            },
+            "description": "The effective price and its full derivation."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The request is malformed (`VALIDATION_ERROR`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Missing, malformed, invalid, or expired bearer token."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Authenticated, but your role lacks `pricing:read`."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "No such SKU (`VARIANT_NOT_FOUND`), or no price in the currency you asked for (`PRICING_UNAVAILABLE`)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "An unexpected server error."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "The database is unreachable. Safe to retry."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "summary": "Calculate the effective price for a SKU",
+        "tags": [
+          "Pricing"
         ]
       }
     },
@@ -3101,6 +4679,14 @@
     {
       "description": "Places inventory is held: warehouses, retail stores, and virtual locations for dropship or in-transit stock.",
       "name": "Locations"
+    },
+    {
+      "description": "Stock levels, adjustments, and reservations. `available` is always computed as `on_hand - reserved` rather than stored, and stock movements are arbitrated by database constraints so two callers cannot both take the last unit.",
+      "name": "Inventory"
+    },
+    {
+      "description": "Effective price calculation. Responses explain the derivation — every rule considered, applied or skipped, and why.",
+      "name": "Pricing"
     },
     {
       "description": "Products and their variants. A product carries merchandising information; a variant is a purchasable unit with a SKU and a price. Inventory and orders reference variants, not products.",

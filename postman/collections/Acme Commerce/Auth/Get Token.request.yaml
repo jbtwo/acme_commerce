@@ -1,0 +1,24 @@
+$kind: http-request
+url: "{{base_url}}/api/v1/auth/token"
+method: POST
+body:
+  type: json
+  content: |-
+    {
+        "email": "dev@acme.example",
+        "password":"dev-password-123" 
+    }
+auth:
+  type: noauth
+scripts:
+  - type: afterResponse
+    code: |-
+      const [header, payload] = pm.response.json().data.access_token.split('.');
+      console.log('header ', JSON.parse(atob(header)));
+      console.log('payload', JSON.parse(atob(payload)));
+
+      const access_token = pm.response.json().data.access_token;
+
+      pm.collectionVariables.set('access_token', access_token);
+    language: text/javascript
+order: 1789396585623

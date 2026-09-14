@@ -41,12 +41,17 @@ export const ERROR_CODES = {
   // -- Absent resources ------------------------------------------------------
   ROUTE_NOT_FOUND: 404,
   LOCATION_NOT_FOUND: 404,
+  INVENTORY_ITEM_NOT_FOUND: 404,
+  RESERVATION_NOT_FOUND: 404,
+  PRICING_UNAVAILABLE: 404,
   PRODUCT_NOT_FOUND: 404,
   VARIANT_NOT_FOUND: 404,
 
   // -- Conflicts with existing state ----------------------------------------
   SKU_ALREADY_EXISTS: 409,
   LOCATION_NAME_EXISTS: 409,
+  INVENTORY_INSUFFICIENT: 409,
+  RESERVATION_NOT_ACTIVE: 409,
 
   // -- Server-side ----------------------------------------------------------
   INTERNAL_ERROR: 500,

@@ -29,6 +29,10 @@ import { AUTH_SHARED_SCHEMAS } from './domain/auth/schemas.js';
 import { registerAuthRoutes } from './domain/auth/routes.js';
 import { LOCATION_SHARED_SCHEMAS } from './domain/locations/schemas.js';
 import { registerLocationRoutes } from './domain/locations/routes.js';
+import { INVENTORY_SHARED_SCHEMAS } from './domain/inventory/schemas.js';
+import { registerInventoryRoutes } from './domain/inventory/routes.js';
+import { PRICING_SHARED_SCHEMAS } from './domain/pricing/schemas.js';
+import { registerPricingRoutes } from './domain/pricing/routes.js';
 import { buildSwaggerOptions } from './openapi/spec.js';
 
 export const API_V1_PREFIX = '/api/v1';
@@ -119,6 +123,8 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
     ...CATALOG_SHARED_SCHEMAS,
     ...AUTH_SHARED_SCHEMAS,
     ...LOCATION_SHARED_SCHEMAS,
+    ...INVENTORY_SHARED_SCHEMAS,
+    ...PRICING_SHARED_SCHEMAS,
   ]) {
     validation.addSchema(schema as unknown as Record<string, unknown>);
   }
@@ -133,6 +139,8 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
   await app.register(registerCatalogRoutes, { prefix: API_V1_PREFIX });
   await app.register(registerAuthRoutes, { prefix: API_V1_PREFIX });
   await app.register(registerLocationRoutes, { prefix: API_V1_PREFIX });
+  await app.register(registerInventoryRoutes, { prefix: API_V1_PREFIX });
+  await app.register(registerPricingRoutes, { prefix: API_V1_PREFIX });
 
   return app;
 }

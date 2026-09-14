@@ -32,6 +32,11 @@ export const ID_PREFIXES = {
   variant: 'var',
   user: 'usr',
   location: 'loc',
+  inventoryItem: 'invitem',
+  inventoryLevel: 'invlvl',
+  inventoryAdjustment: 'invadj',
+  inventoryReservation: 'invres',
+  pricingRule: 'prule',
   request: 'req',
 } as const;
 
@@ -86,4 +91,9 @@ export const productId = () => generateId('product');
 export const variantId = () => generateId('variant');
 export const userId = () => generateId('user');
 export const locationId = () => generateId('location');
+export const inventoryItemId = () => generateId('inventoryItem');
+export const inventoryLevelId = () => generateId('inventoryLevel');
+export const inventoryAdjustmentId = () => generateId('inventoryAdjustment');
+export const inventoryReservationId = () => generateId('inventoryReservation');
+export const pricingRuleId = () => generateId('pricingRule');
 export const requestId = () => generateId('request');

@@ -15,6 +15,7 @@ import { createHash } from 'node:crypto';
 import type { AppDatabase } from '../index.js';
 import { SEED_EXPECTED, SEED_PRODUCTS } from './data.js';
 import { SEED_AUTH_EXPECTED, SEED_LOCATIONS, SEED_USERS } from './auth-data.js';
+import { SEED_INVENTORY, SEED_INVENTORY_EXPECTED, SEED_PRICING_RULES } from './inventory-data.js';
 import { hashPassword } from '../../domain/auth/passwords.js';
 
 /**
@@ -36,6 +37,8 @@ export interface SeedSummary {
   variantsInserted: number;
   users: number;
   locations: number;
+  inventoryLevels: number;
+  pricingRules: number;
 }
 
 /** Archived seed records need a consistent archived_at — the schema CHECK requires it. */
@@ -140,6 +143,7 @@ export async function seedDatabase(db: AppDatabase): Promise<SeedSummary> {
   }
 
   const { users, locations } = await seedAuthAndLocations(db);
+  const { inventoryLevels, pricingRules } = await seedInventoryAndPricing(db);
 
   return {
     products: SEED_EXPECTED.products,
@@ -148,7 +152,128 @@ export async function seedDatabase(db: AppDatabase): Promise<SeedSummary> {
     variantsInserted,
     users,
     locations,
+    inventoryLevels,
+    pricingRules,
   };
+}
+
+/**
+ * Inventory items, stock levels, and pricing rules.
+ *
+ * Creates one inventory item per seeded SKU and links it back onto the variant — this is what
+ * finally populates `variants.inventory_item_id`, the column deliberately left null in
+ * Milestone 1 so the seam between catalog and inventory would be visible rather than pretended
+ * away.
+ *
+ * Levels are set with an absolute `on_hand` rather than an adjustment, and deliberately write
+ * no rows to `inventory_adjustments`. The audit log records what people did; fabricating
+ * history for fixture data would make it a worse record, and every real adjustment made
+ * through the API from now on appears there truthfully.
+ */
+async function seedInventoryAndPricing(
+  db: AppDatabase,
+): Promise<{ inventoryLevels: number; pricingRules: number }> {
+  let inventoryLevels = 0;
+  let pricingRules = 0;
+
+  await db.transaction().execute(async (trx) => {
+    // One inventory item per SKU that appears in the level fixtures.
+    const skus = [...new Set(SEED_INVENTORY.map(([sku]) => sku))];
+    for (const sku of skus) {
+      const itemId = deterministicId('invitem', sku);
+      await trx
+        .insertInto('inventory_items')
+        .values({ id: itemId, sku, tracked: true })
+        .onConflict((oc) => oc.column('id').doUpdateSet({ sku, tracked: true }))
+        .execute();
+      await trx
+        .updateTable('variants')
+        .set({ inventory_item_id: itemId })
+        .where('sku', '=', sku)
+        .execute();
+    }
+
+    for (const [sku, locationHandle, onHand] of SEED_INVENTORY) {
+      const itemId = deterministicId('invitem', sku);
+      const locId = deterministicId('loc', locationHandle);
+      const written = await trx
+        .insertInto('inventory_levels')
+        .values({
+          id: deterministicId('invlvl', `${sku}:${locationHandle}`),
+          inventory_item_id: itemId,
+          location_id: locId,
+          on_hand: onHand,
+          reserved: 0,
+        })
+        .onConflict((oc) =>
+          // Re-seeding resets stock to the fixture value and clears reservations, so a
+          // development database returns to a known state rather than drifting with use.
+          oc.column('id').doUpdateSet({ on_hand: onHand, reserved: 0 }),
+        )
+        .returning('id')
+        .executeTakeFirst();
+      if (written) inventoryLevels += 1;
+    }
+
+    for (const r of SEED_PRICING_RULES) {
+      const written = await trx
+        .insertInto('pricing_rules')
+        .values({
+          id: deterministicId('prule', r.handle),
+          name: r.name,
+          type: r.type,
+          scope_kind: r.scope_kind,
+          scope_value: r.scope_value,
+          adjustment_kind: r.adjustment_kind,
+          adjustment_value: r.adjustment_value,
+          min_quantity: r.min_quantity,
+          customer_group: r.customer_group,
+          partner_id: r.partner_id,
+          priority: r.priority,
+          starts_at: null,
+          ends_at: null,
+          is_active: true,
+        })
+        .onConflict((oc) =>
+          oc.column('id').doUpdateSet({
+            name: r.name,
+            type: r.type,
+            scope_kind: r.scope_kind,
+            scope_value: r.scope_value,
+            adjustment_kind: r.adjustment_kind,
+            adjustment_value: r.adjustment_value,
+            min_quantity: r.min_quantity,
+            customer_group: r.customer_group,
+            partner_id: r.partner_id,
+            priority: r.priority,
+            is_active: true,
+          }),
+        )
+        .returning('id')
+        .executeTakeFirst();
+      if (written) pricingRules += 1;
+    }
+
+    // Reservations created by earlier runs would otherwise keep stock held against fixture
+    // levels that were just reset to reserved = 0.
+    await trx
+      .updateTable('inventory_reservations')
+      .set({ status: 'released', released_at: new Date() })
+      .where('status', '=', 'active')
+      .execute();
+  });
+
+  if (inventoryLevels !== SEED_INVENTORY_EXPECTED.levels) {
+    throw new Error(
+      `Seed wrote ${inventoryLevels} inventory levels but expected ${SEED_INVENTORY_EXPECTED.levels}`,
+    );
+  }
+  if (pricingRules !== SEED_INVENTORY_EXPECTED.rules) {
+    throw new Error(
+      `Seed wrote ${pricingRules} pricing rules but expected ${SEED_INVENTORY_EXPECTED.rules}`,
+    );
+  }
+  return { inventoryLevels, pricingRules };
 }
 
 /**

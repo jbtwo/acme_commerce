@@ -376,6 +376,39 @@ There is no `DELETE`. Inventory levels and the adjustment audit log reference lo
 retiring one is `{"is_active": false}` — which is what "delete this warehouse" means in a
 business that has shipped from it.
 
+### Inventory — `/api/v1`
+
+| Method | Path                                          | `operationId`                 | Requires          |
+| ------ | --------------------------------------------- | ----------------------------- | ----------------- |
+| `GET`  | `/api/v1/inventory`                           | `listInventory`               | `inventory:read`  |
+| `GET`  | `/api/v1/inventory/history`                   | `listInventoryHistory`        | `inventory:read`  |
+| `GET`  | `/api/v1/inventory/{sku}`                     | `getInventoryForSku`          | `inventory:read`  |
+| `POST` | `/api/v1/inventory/adjustments`               | `createInventoryAdjustment`   | `inventory:write` |
+| `POST` | `/api/v1/inventory/reservations`              | `createInventoryReservation`  | `inventory:write` |
+| `GET`  | `/api/v1/inventory/reservations/{id}`         | `getInventoryReservation`     | `inventory:read`  |
+| `POST` | `/api/v1/inventory/reservations/{id}/release` | `releaseInventoryReservation` | `inventory:write` |
+
+`available` is **computed** as `on_hand - reserved`, never stored — a third stored number is
+the first thing to disagree with the other two. `?available_below=5` filters on the computed
+value, so stock that is present but fully reserved correctly counts as unavailable.
+
+Reservations are arbitrated by a `CHECK (reserved <= on_hand)` constraint rather than by
+reading availability and then writing, so two callers cannot both take the last unit. Losing
+that race returns `409 INVENTORY_INSUFFICIENT` with the authoritative quantity.
+
+`/inventory/{sku}` takes a **SKU, not an opaque id** — the one place a natural key sits in a
+path, because that is how people refer to stock.
+
+### Pricing — `/api/v1`
+
+| Method | Path                    | `operationId`       | Requires       |
+| ------ | ----------------------- | ------------------- | -------------- |
+| `GET`  | `/api/v1/pricing/{sku}` | `getEffectivePrice` | `pricing:read` |
+
+Returns the price **and its derivation** — every rule considered, in the order applied, plus
+the ones that did _not_ apply and why. Rules apply in ascending priority against the running
+subtotal, so two 10% discounts compound to 19%, not 20%.
+
 ### Catalog — `/api/v1`
 
 | Method   | Path                                    | `operationId`         | Success            |
@@ -495,13 +528,13 @@ what a wrong base URL produces.
 ## 14. Automated testing
 
 ```bash
-npm test                   # everything: 261 tests
-npm run test:unit          # 114 tests, no database
-npm run test:integration   # 147 tests, real PostgreSQL
+npm test                   # everything: 408 tests
+npm run test:unit          # 157 tests, no database
+npm run test:integration   # 251 tests, real PostgreSQL
 npm run openapi:check      # contract drift — fails on any difference
 npm run openapi:lint       # Redocly structural + governance rules
 npm run verify             # format, lint, typecheck, test, openapi:check, openapi:lint
-npm run smoke              # 103 assertions over a real socket (needs a running server)
+npm run smoke              # 169 assertions over a real socket (needs a running server)
 ```
 
 Integration tests use `TEST_DATABASE_URL` and drop the application schema between files. Before
@@ -622,7 +655,7 @@ Both were exercised locally. Neither has been run on an actual Unraid server —
 | 5A               | Contract validation, governance, versioning, CI | Not started           |
 | 6                | Complete learning platform                      | Not started           |
 
-### Current checkpoint: STOP AND LEARN 1 — Catalog API
+### Current checkpoint: STOP AND LEARN 2 — Authentication, Inventory, Pricing
 
 The Catalog API is built and independently verified. Evidence, exact commands, and observed
 output are in [`docs/BUILD_VERIFICATION.md`](docs/BUILD_VERIFICATION.md).
@@ -660,3 +693,4 @@ and committed, they have been reviewed, and continuation is explicitly authorise
 | [`docs/DEVELOPMENT_WORKFLOW.md`](docs/DEVELOPMENT_WORKFLOW.md) | The 17-step change lifecycle, and what each step catches           |
 | [`LEARNING_GUIDE.md`](LEARNING_GUIDE.md)                       | API engineering concepts as they appear here. Grows each milestone |
 | [`PERSONAS.md`](PERSONAS.md)                                   | Who participates, what they need, what frustrates them             |
+| [`docs/LEARNING_PLAN_AUDIT.md`](docs/LEARNING_PLAN_AUDIT.md)   | Audit of this plan against Strategic SE / SDLC-automation needs    |

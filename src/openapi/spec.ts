@@ -156,6 +156,19 @@ export function buildSwaggerOptions(config: Config): SwaggerOptions {
             'dropship or in-transit stock.',
         },
         {
+          name: 'Inventory',
+          description:
+            'Stock levels, adjustments, and reservations. `available` is always computed as ' +
+            '`on_hand - reserved` rather than stored, and stock movements are arbitrated by ' +
+            'database constraints so two callers cannot both take the last unit.',
+        },
+        {
+          name: 'Pricing',
+          description:
+            'Effective price calculation. Responses explain the derivation — every rule ' +
+            'considered, applied or skipped, and why.',
+        },
+        {
           name: 'Catalog',
           description:
             'Products and their variants. A product carries merchandising information; a ' +
