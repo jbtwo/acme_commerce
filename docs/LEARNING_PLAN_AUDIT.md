@@ -149,10 +149,27 @@ Legend: ✅ covered well · ⚠️ partial / conceptual only · ❌ absent · �
 
 Nothing here is _wrong_; it is all well-built. This is about where **further** time goes.
 
+**Explicitly kept, by the learner's decision (2026-09-14): the Unraid deployment and the
+PostgreSQL setup.** The goal is a real production instance to test against. An earlier draft of
+this audit listed both as cut candidates on the grounds that the ramp plan excludes
+infrastructure depth. That was wrong for this case, and the reason matters:
+
+- **A deployed instance is a hard prerequisite for CP4.** Monitors need a reachable target. You
+  cannot learn Monitors, alert routing, or synthetic coverage against `127.0.0.1`.
+- **An Unraid box behind home NAT is the best available substrate for the single named gap in
+  `state/learning-plan.md` M4** — *"our APIs are internal, behind the firewall, on EKS."* That is
+  exactly what **Monitor Runners** exist to solve, and you will have the real problem on your own
+  hardware rather than a described one. Reasoning toward that answer in an interview is not the
+  same as having done it.
+- **`base_url` swapping between local and deployed** is what makes `LEARNING_GUIDE.md` §7's
+  environment diagnostics real instead of hypothetical.
+
+The boundary that still holds: build it, deploy it, keep it running — but do not turn it into a
+homelab project. Postgres tuning, backup/restore rehearsals, and connection-model comparisons past
+the one you actually use are where the diminishing returns start.
+
 | Cut                                                                            | Why                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`docs/UNRAID_DEPLOYMENT.md` — any more work on it**                          | Two connection models, container DNS, LAN port exposure. Your own ramp plan excludes cloud-infrastructure depth and quotes the team's transition guide: _"time spent becoming marginally more technical is often better spent becoming more fluent in engineering leader language."_ None of the five why-now forces is infrastructure. **Deploy it once, somewhere, so monitors have a public target — then stop.** |
-| **`docs/POSTGRES_SETUP.md` depth — privileges, TLS, pooling, backup, restore** | Same reason. A Strategic SE needs "there is a database and it has a schema," not `pg_trgm` and role grants. Already written; don't extend it.                                                                                                                                                                                                                                                                        |
 | **Dockerfile / GHCR release-pipeline depth**                                   | The multi-tag `edge`/`vX.Y.Z` strategy is good engineering and near-zero SE value. The CI you need is a **Postman CLI gate job**, not a better image pipeline.                                                                                                                                                                                                                                                       |
 | **Milestone 3 (Customers, Orders, Fulfillment) at full scope**                 | Idempotency and state machines are worth one endpoint each. A full order/fulfillment domain is weeks of modelling that teaches commerce, not Postman. Compress hard.                                                                                                                                                                                                                                                 |
 | **Milestone 4 Partner API + webhooks at full scope**                           | Keep webhooks — Postman shipped first-class webhook support in May 2026 and it is a real demo asset. Cut the partner API-key/isolation domain work; Partner Workspaces is the SE-relevant concept and it is a product feature, not something you build.                                                                                                                                                              |

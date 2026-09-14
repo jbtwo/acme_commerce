@@ -175,13 +175,27 @@ jobs:
           docker run -d --name ci-check -p 3000:3000 \
             -e DATABASE_URL='postgres://ci:ci@127.0.0.1:5432/ci_not_reachable' \
             -e DB_CONNECT_TIMEOUT_MS=1000 \
+            -e AUTH_TOKEN_SECRET='ci-smoke-check-signing-key-not-used-to-sign-anything' \
             acme-commerce:ci
 
           echo "Waiting for the process to accept connections..."
           for _ in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:3000/health -o /tmp/health.json 2>/dev/null; then break; fi
+            # A container that has already exited will never answer. Fail fast and say why,
+            # rather than burning the full timeout on something that is definitively dead.
+            if [ "$(docker inspect -f '{{.State.Running}}' ci-check)" != 'true' ]; then
+              echo "::error::The container exited before serving. Exit code: $(docker inspect -f '{{.State.ExitCode}}' ci-check)"
+              docker logs ci-check
+              exit 1
+            fi
             sleep 1
           done
+
+          if [ ! -f /tmp/health.json ]; then
+            echo "::error::/health never responded."
+            docker logs ci-check
+            exit 1
+          fi
 
           echo "--- GET /health ---"
           cat /tmp/health.json; echo
