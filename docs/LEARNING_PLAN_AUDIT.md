@@ -157,7 +157,7 @@ infrastructure depth. That was wrong for this case, and the reason matters:
 - **A deployed instance is a hard prerequisite for CP4.** Monitors need a reachable target. You
   cannot learn Monitors, alert routing, or synthetic coverage against `127.0.0.1`.
 - **An Unraid box behind home NAT is the best available substrate for the single named gap in
-  `state/learning-plan.md` M4** — *"our APIs are internal, behind the firewall, on EKS."* That is
+  `state/learning-plan.md` M4** — _"our APIs are internal, behind the firewall, on EKS."_ That is
   exactly what **Monitor Runners** exist to solve, and you will have the real problem on your own
   hardware rather than a described one. Reasoning toward that answer in an interview is not the
   same as having done it.
@@ -168,12 +168,12 @@ The boundary that still holds: build it, deploy it, keep it running — but do n
 homelab project. Postgres tuning, backup/restore rehearsals, and connection-model comparisons past
 the one you actually use are where the diminishing returns start.
 
-| Cut                                                                            | Why                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Dockerfile / GHCR release-pipeline depth**                                   | The multi-tag `edge`/`vX.Y.Z` strategy is good engineering and near-zero SE value. The CI you need is a **Postman CLI gate job**, not a better image pipeline.                                                                                                                                                                                                                                                       |
-| **Milestone 3 (Customers, Orders, Fulfillment) at full scope**                 | Idempotency and state machines are worth one endpoint each. A full order/fulfillment domain is weeks of modelling that teaches commerce, not Postman. Compress hard.                                                                                                                                                                                                                                                 |
-| **Milestone 4 Partner API + webhooks at full scope**                           | Keep webhooks — Postman shipped first-class webhook support in May 2026 and it is a real demo asset. Cut the partner API-key/isolation domain work; Partner Workspaces is the SE-relevant concept and it is a product feature, not something you build.                                                                                                                                                              |
-| **PERSONAS.md — 12 engineering personas**                                      | Genuinely good writing, but it is an _engineering_ persona set. The five you are assessed on are Platform Eng/DevEx/API CoE, Security/IT, QA lead, Product Eng/EM, and Partner/API product owner — each with proof points and a demo order, in `POSTMAN_CONTEXT.md` §"Buyer Personas". Don't expand PERSONAS.md; add a short mapping table from its 12 to those 5, and learn the 5.                                  |
+| Cut                                                            | Why                                                                                                                                                                                                                                                                                                                                                                                 |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Dockerfile / GHCR release-pipeline depth**                   | The multi-tag `edge`/`vX.Y.Z` strategy is good engineering and near-zero SE value. The CI you need is a **Postman CLI gate job**, not a better image pipeline.                                                                                                                                                                                                                      |
+| **Milestone 3 (Customers, Orders, Fulfillment) at full scope** | Idempotency and state machines are worth one endpoint each. A full order/fulfillment domain is weeks of modelling that teaches commerce, not Postman. Compress hard.                                                                                                                                                                                                                |
+| **Milestone 4 Partner API + webhooks at full scope**           | Keep webhooks — Postman shipped first-class webhook support in May 2026 and it is a real demo asset. Cut the partner API-key/isolation domain work; Partner Workspaces is the SE-relevant concept and it is a product feature, not something you build.                                                                                                                             |
+| **PERSONAS.md — 12 engineering personas**                      | Genuinely good writing, but it is an _engineering_ persona set. The five you are assessed on are Platform Eng/DevEx/API CoE, Security/IT, QA lead, Product Eng/EM, and Partner/API product owner — each with proof points and a demo order, in `POSTMAN_CONTEXT.md` §"Buyer Personas". Don't expand PERSONAS.md; add a short mapping table from its 12 to those 5, and learn the 5. |
 
 ---
 
@@ -345,17 +345,22 @@ executive outcomes in CotM §7.
 
 ### Milestone table
 
-| Was                                                   | Becomes                              | Change                                                                                                                                |
-| ----------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
-| CP1 — first collection                                | **CP1 — Collection + testing depth** | Expand: schema assertions, Runner, CSV data-driven, scripts. Your stated priority                                                     |
-| —                                                     | **CP2 — Gate** ⭐ NEW                | Spec Hub, governance rules, Postman CLI in CI, breaking change, deliberate flake, Git-connected workspace. **Insert here, not at M5** |
-| M2A — Auth, Locations, Inventory, Pricing             | M2A, unchanged                       | Good as planned. Collection-level auth is the Postman payoff                                                                          |
-| M3A — Customers, Orders, Fulfillment                  | **Compressed**                       | One idempotent endpoint + one state machine. Skip the domain                                                                          |
-| M4A — Partner API, Webhooks                           | **Webhooks only**                    | Cut partner API-key isolation                                                                                                         |
-| —                                                     | **CP3 — Validate** NEW               | Package Library, mock servers (incl. code-based local mocks), `setNextRequest`, e2e chain                                             |
-| —                                                     | **CP4 — Monitor** NEW                | Deploy once. Monitors, Monitor Runners, performance profiles, alert routing                                                           |
-| M5A — Contract validation, governance, versioning, CI | **Versioning + deprecation only**    | Governance and CI moved to CP2                                                                                                        |
-| M6 — Complete learning platform                       | **Management Plane, non-build**      | `/peas` on a sandbox + API Catalog + ASA reading                                                                                      |
+**Ordering note.** CP2 (Gate) goes **after M2A, not before it.** A gate on an unauthenticated API
+cannot teach collection-level auth inheritance or service-account CI identity, and both are on the
+required list. So: CP1 → M2A → CP2. This still pulls governance and CI forward by three
+milestones, which is the point of F1.
+
+| Was | Becomes | Change |
+|---|---|---|
+| CP1 — first collection | **CP1 — Collection + testing depth** | Expand: schema assertions, Runner, CSV data-driven, scripts. Your stated priority |
+| M2A — Auth, Locations, Inventory, Pricing | M2A, unchanged | Good as planned. Collection-level auth is the Postman payoff, and CP2 depends on it |
+| — | **CP2 — Gate** ⭐ NEW | Spec Hub, governance rules, Postman CLI in CI, breaking change, deliberate flake, Git-connected workspace. **Insert here, not at M5** |
+| M3A — Customers, Orders, Fulfillment | **Compressed** | One idempotent endpoint + one state machine. Skip the domain |
+| M4A — Partner API, Webhooks | **Webhooks only** | Cut partner API-key isolation |
+| — | **CP3 — Validate** NEW | Package Library, mock servers (incl. code-based local mocks), `setNextRequest`, e2e chain |
+| — | **CP4 — Monitor** NEW | **Prereq: the Unraid deployment, live.** Monitors, **Monitor Runners** against the box behind your home firewall, alert routing. Performance profiles are conceptual only — `perf_test_milli_vuh` is 0 |
+| M5A — Contract validation, governance, versioning, CI | **Versioning + deprecation only** | Governance and CI moved to CP2 |
+| M6 — Complete learning platform | **Management Plane, non-build** | `/peas` + API Catalog + ASA reading. Plan-gated — see §5b tier B |
 
 ### Two-spine split (F5)
 
