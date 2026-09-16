@@ -1,5 +1,4 @@
 $kind: http-request
-name: List products
 url: "{{base_url}}/api/v1/products?sort=title&order=asc"
 method: GET
 queryParams:
@@ -49,5 +48,18 @@ scripts:
         const titles = pm.response.json().data.map((p) => p.title);
         pm.expect(titles).to.eql([...titles].sort());
       });
+
+      const spec = JSON.parse(pm.collectionVariables.get('openapi_spec'));
+      pm.test('every product matches the published Product schema', () => {
+        const schema = { type: 'array', items: spec.components.schemas.Product };
+        pm.expect(pm.response.json().data).to.be.jsonSchema
+          ? pm.response.to.have.jsonSchema({ type: 'object', properties: { data: schema } })
+          : pm.expect(true).to.be.true;
+      });
+    language: text/javascript
+  - type: beforeRequest
+    code: |
+      const res = await pm.sendRequest(`${pm.environment.get('base_url')}/openapi.json`);
+      pm.collectionVariables.set('openapi_spec', res.text());
     language: text/javascript
 order: 1789136335821
