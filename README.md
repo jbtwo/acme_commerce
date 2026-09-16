@@ -643,62 +643,66 @@ Both were exercised locally. Neither has been run on an actual Unraid server —
 
 ---
 
-## 18. Milestone status
+## 18. Status
 
-| #       | Scope                                | Type       | Status                        |
-| ------- | ------------------------------------ | ---------- | ----------------------------- |
-| **M1A** | Foundation and Catalog API           | Build      | ✅ Built, verified, deployed  |
-| **CP1** | Collection and testing depth         | Checkpoint | 🔨 Groups 1–4 done, 5–7 added |
-| **M2A** | Auth, Locations, Inventory, Pricing  | Build      | ✅ Built and verified         |
-| **CP2** | **Gate** — Spec Hub, governance, CI  | Checkpoint | ⬅ **Current**                 |
-| **M3A** | Idempotency and one state machine    | Build      | Not started                   |
-| **CP3** | Validate — packages, mocks, chaining | Checkpoint | Not started                   |
-| **M4A** | Webhooks                             | Build      | Not started                   |
-| **CP4** | Monitor — monitors, Monitor Runners  | Checkpoint | Not started                   |
-| **M5A** | Versioning and deprecation           | Build      | Not started                   |
-| **M6**  | Management Plane                     | Non-build  | Not started                   |
+### Build
 
-Sequence revised 2026-09-14 against [`docs/LEARNING_PLAN_AUDIT.md`](docs/LEARNING_PLAN_AUDIT.md).
-The audit found the original ordering put governance, contract validation and CI **last** —
-behind four milestones of ecommerce domain modelling — when the gate is the centre of the motion
-being measured. CP2 moved from Milestone 5 to immediately after 2A; 3A and 4A were compressed to
-the concepts that carry their weight.
+| #       | Scope                               | Status                       |
+| ------- | ----------------------------------- | ---------------------------- |
+| **M1A** | Foundation and Catalog API          | ✅ Built, verified, deployed |
+| **M2A** | Auth, Locations, Inventory, Pricing | ✅ Built, verified, deployed |
+| —       | Idempotency, webhooks, versioning   | On demand — see below        |
 
-Checkpoint tasks and done-when conditions live in
-[`docs/CHECKPOINTS.md`](docs/CHECKPOINTS.md).
+**Build work is now on demand.** The API is scaffolding for learning Postman, not the
+deliverable. Milestones 3A, 4A and 5A are no longer scheduled; they get built only if a feature
+tour needs something that does not exist. As things stand only a webhooks tour would.
 
-### Current checkpoint: CP2 — Gate
+Deployed: `ghcr.io/jbtwo/acme_commerce:0.3.0` on Unraid, reachable at `http://10.0.1.7:3001`.
 
-Milestone 2A is built and verified — evidence in
-[`docs/BUILD_VERIFICATION.md`](docs/BUILD_VERIFICATION.md).
+### Learning
 
-**Next: turn a collection you run into a gate that runs itself and blocks a merge.** Spec Hub,
-governance rules, the Postman CLI in CI, a deliberate breaking change, and a deliberately flaky
-test. Full task list in [`docs/CHECKPOINTS.md`](docs/CHECKPOINTS.md).
+| #      | Tour                       | Plane      | Enterprise?     | Status         |
+| ------ | -------------------------- | ---------- | --------------- | -------------- |
+| **T1** | Activity Plane essentials  | Activity   | No              | 🔨 Mostly done |
+| **T2** | Design — Spec Hub          | Management | Partly          | ⬅ **Current**  |
+| **T3** | Gate — CLI, CI, governance | Management | Governance only | Not started    |
+| **T4** | Catalog and discovery      | Management | **Yes**         | Not started    |
+| **T5** | Identity and security      | Management | **Mostly**      | Not started    |
+| **T6** | Simulate and observe       | Both       | Runners only    | Not started    |
+| **T7** | Collaborate and distribute | Management | Partly          | Not started    |
 
-|                |                                                                             |
-| -------------- | --------------------------------------------------------------------------- |
-| Local base URL | `http://127.0.0.1:3000`                                                     |
-| OpenAPI        | `http://127.0.0.1:3000/openapi.json`                                        |
-| Swagger UI     | `http://127.0.0.1:3000/docs`                                                |
-| Seeded logins  | `dev@`, `support@`, `admin@acme.example` — password `dev-password-123`      |
-| Seeded data    | 20 products · 49 variants · 3 locations · 45 stock levels · 6 pricing rules |
-| Prerequisites  | `./scripts/dev-postgres.sh`, then `npm run dev`                             |
+Revised **2026-09-16** for breadth over depth. The standard for each feature is: you have touched
+it once, you know what it does, you know who buys it, and you know whether it is Enterprise-gated.
+Tasks in [`docs/CHECKPOINTS.md`](docs/CHECKPOINTS.md).
 
-**Two things to know before starting.**
+The 2026-09-14 revision against [`docs/LEARNING_PLAN_AUDIT.md`](docs/LEARNING_PLAN_AUDIT.md)
+moved governance and CI forward from Milestone 5; this one drops the remaining domain-modelling
+milestones entirely and reorganises the learning side around the Postman feature surface rather
+than around API-engineering concepts.
 
-Your collection **cannot run in CI as it stands**. The auth helper reads the seeded password from
-Postman **Local Vault**, which the Postman CLI cannot see. That is CP2 task 0, and choosing
-between Shared Vault and injecting the credential at run time is the actual lesson rather than an
-obstacle.
+### Current: T2 — Spec Hub
 
-**Tier B is Enterprise-gated.** Governance rules and API Catalog require an Enterprise plan —
-confirm under **Team Settings → Plan** before planning around them. Tier A stands entirely on its
-own and is the majority of the value.
+Put `openapi/openapi.json` into Spec Hub, generate a collection from it, change the spec and
+watch the sync. Then T3 wires the Postman CLI into CI as a gate.
+
+|                     |                                                                             |
+| ------------------- | --------------------------------------------------------------------------- |
+| Local               | `http://127.0.0.1:3000`                                                     |
+| Deployed            | `http://10.0.1.7:3001`                                                      |
+| OpenAPI             | `/openapi.json` on either                                                   |
+| Seeded logins       | `dev@`, `support@`, `admin@acme.example` — password `dev-password-123`      |
+| Seeded data         | 20 products · 49 variants · 3 locations · 45 stock levels · 6 pricing rules |
+| Local prerequisites | `./scripts/dev-postgres.sh`, then `npm run dev`                             |
+
+**Confirm Team Settings → Plan before T4.** Governance rules, API Catalog and Partner Workspaces
+need Enterprise. Where a feature is gated, the tour says what to do instead.
+
+**One known blocker, at T3.** Your collection cannot run in CI as it stands — the auth helper
+reads from Postman Local Vault, which the Postman CLI cannot see. Shared Vault or a run-time
+`--env-var` both solve it.
 
 Nothing in `postman/` is generated. You build every request, environment, script and test by
-hand; the API is verified first so that when something fails, "the API is broken" is a hypothesis
-to rule out rather than the assumed answer.
+hand.
 
 ## 19. Documentation index
 

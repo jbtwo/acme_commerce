@@ -18,6 +18,9 @@ variables:
   - key: token_expires_at
     value: ""
     disabled: false
+  - key: openapi_spec
+    value: ""
+    disabled: false
 scripts:
   - type: http:beforeRequest
     code: |-

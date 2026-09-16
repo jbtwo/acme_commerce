@@ -1,378 +1,265 @@
-# Learning checkpoints
+# Feature tours
 
-The build side of this project produces an API. This document is the other half: what you do
-with it, in what order, and how you know you are done.
+What to do with the API, in what order, and how you know you are done.
 
-Revised 2026-09-14 against `docs/LEARNING_PLAN_AUDIT.md`. The audit's central finding was that
-the original sequence put governance, contract validation and CI **last** — behind four
-milestones of ecommerce domain modelling — when the gate is the centre of what a Strategic
-Solutions Engineer is measured on. Checkpoint 2 now sits immediately after Milestone 2A instead
-of at Milestone 5.
+Revised **2026-09-16**. The previous version went deep on API-engineering craft — schema
+assertion subtleties, ordering stability, error-contract design. That is good engineering and
+it is not what you are being assessed on. This version optimises for **breadth of the Postman
+feature surface**, weighted toward the **Enterprise** features, at the shallowest depth that
+still lets you speak to them.
 
----
+## The standard being aimed at
 
-## How a checkpoint works
+For each feature: **you have touched it once, you know what it does, you know who buys it, and
+you know whether it is Enterprise-gated.** Not "you can explain its failure modes under
+concurrency."
 
-Unchanged from Milestone 1, because the separation is the point.
+That is deliberately a lower bar than the previous revision and a higher one than reading the
+docs. The difference between "I've read about Spec Hub" and "I've put a spec in Spec Hub and
+watched a collection follow it" is the difference between describing a product and demonstrating
+one.
 
-1. The API is **built and independently verified without Postman** — tests, `scripts/smoke.sh`,
-   curl. Evidence lands in `docs/BUILD_VERIFICATION.md`.
-2. Work stops.
-3. **You build every Postman asset by hand.** Nothing in `postman/` is generated. Not the
-   collection, not the environments, not the tests, not the scripts.
-4. Tasks arrive in groups of three to five. You report results before the next group.
-5. Your exported assets get reviewed — recommendations, not edits.
+**Depth comes later, and only where it pays.** Base API testing is your stated strength area and
+the one place extra depth is worth buying — Tour 1 carries that. Everywhere else, one pass.
 
-The reason for step 3 is worth restating: a generated collection teaches you what a generator
-produces. Building one by hand teaches you what a variable scope is, why a base URL belongs in
-an environment, and — most usefully — what it feels like when a request fails and you have to
-work out whether the fault is yours or the API's. The API is verified first specifically so
-that "the API is broken" is a hypothesis you have to rule out rather than assume. Twice now it
-genuinely has been.
+## What stays from before
 
-### Done-when conditions
+Nothing in `postman/` is generated. You build it. The API is verified without Postman first, so
+that when something fails, "the API is broken" is a hypothesis to rule out rather than assume.
+That has caught real defects twice and it is not overhead.
 
-Every checkpoint below ends with a condition phrased as something you can **explain**, not
-something you performed. That is deliberate and it follows `docs/MILESTONE_1_PLAN.md` §14.
+## Build work is now on demand
 
-Performing a task proves you followed instructions. Explaining why it works — and what it does
-_not_ prove — is what survives into a customer conversation where nobody hands you the steps.
+The API is scaffolding. Milestones 3A, 4A and 5A are **no longer scheduled** — they get built
+only if a tour needs something that does not exist yet. As things stand, only a webhooks tour
+would require new endpoints.
 
 ---
 
 ## Sequence
 
-| #       | Name                                | Type               | Status                                         |
-| ------- | ----------------------------------- | ------------------ | ---------------------------------------------- |
-| **M1A** | Foundation and Catalog API          | Build              | ✅ Built, verified, deployed                   |
-| **CP1** | Collection and testing depth        | Checkpoint         | 🔨 Groups 1–4 done; 5–7 added by this revision |
-| **M2A** | Auth, Locations, Inventory, Pricing | Build              | ✅ Complete                                    |
-| **CP2** | **Gate**                            | Checkpoint         | ⬅ **Next**                                     |
-| **M3A** | Idempotency and one state machine   | Build (compressed) | Not started                                    |
-| **CP3** | Validate                            | Checkpoint         | Not started                                    |
-| **M4A** | Webhooks                            | Build (reduced)    | Not started                                    |
-| **CP4** | Monitor                             | Checkpoint         | Not started                                    |
-| **M5A** | Versioning and deprecation          | Build (reduced)    | Not started                                    |
-| **M6**  | Management Plane                    | Non-build          | Not started                                    |
+| #      | Tour                       | Plane      | Enterprise?     | Status         |
+| ------ | -------------------------- | ---------- | --------------- | -------------- |
+| **T1** | Activity Plane essentials  | Activity   | No              | 🔨 Mostly done |
+| **T2** | Design — Spec Hub          | Management | Partly          | ⬅ **Next**     |
+| **T3** | Gate — CLI, CI, governance | Management | Governance only | Not started    |
+| **T4** | Catalog and discovery      | Management | **Yes**         | Not started    |
+| **T5** | Identity and security      | Management | **Mostly**      | Not started    |
+| **T6** | Simulate and observe       | Both       | Runners only    | Not started    |
+| **T7** | Collaborate and distribute | Management | Partly          | Not started    |
 
-Two changes from the audit's own §6 table, and the reasons:
+One sitting each, roughly. T2 and T3 are the two that close the gap the audit flagged; do those
+first even if you skip others.
 
-- **CP3 moved to sit after M3A**, not after M4A. The audit's ordering put two build milestones
-  back to back with no checkpoint between them, which breaks the build→verify→learn rhythm the
-  whole project runs on.
-- **Webhooks (M4A) pair with CP4** rather than CP3. Webhook delivery and monitoring are both
-  "observe what the system actually did", and both need the deployed instance.
+> **Enterprise gating is unconfirmed.** Several tours depend on your team `justin-v12` being on
+> Enterprise. Check **Team Settings → Plan** before T4. Where a feature is gated, each tour says
+> what to do instead — and "know what it does and who it is for" is reachable from the docs
+> either way.
 
 ---
 
-## CP1 — Collection and testing depth
+## T1 — Activity Plane essentials 🔨
 
-**Objective.** Get fluent in the mechanics a QA lead will probe. This is your stated priority
-and the thing your audience already knows, so shallow coverage here is the most expensive kind.
+Collections, environments, variables and scopes, collection-level auth with per-request
+override, pre-request and post-response scripts, chaining. **All done.**
 
-**Status.** Groups 1–4 are complete: workspace, collection, two environments, folder structure,
-collection-level pre-request guard, request chaining, and a unique-SKU generator so the Workflow
-folder is re-runnable. Groups 5–7 are added by this revision — the audit was right that three
-`pm.test()` assertions on `/health` is day one, not expertise.
+Three gaps left, and they are quick:
 
-### Group 5 — Assertions that are worth writing
+1. **Collection Runner, beyond running a folder.** Run with iterations set to 5. Note the export
+   button — that result file is what CI consumes, which is T3.
+2. **Data-driven runs.** A CSV with `sku` and `expected_status` columns, referenced as
+   `{{sku}}` and read with `pm.iterationData.get('sku')`. One request, N scenarios, one report.
+   This is the answer to "how do you get from forty tests to four thousand", which is the
+   question a QA lead is actually asking.
+3. **One schema assertion.** `pm.response.to.have.jsonSchema()` against a schema pulled from
+   your own `/openapi.json`. Once, so you know it exists.
 
-Three status checks is not a test suite. The interesting assertions are the ones that fail for
-a reason you would not have guessed.
-
-1. **Assert a response against its own published schema.** `pm.response.to.have.jsonSchema()`
-   takes a JSON Schema object. You already serve one: fetch `{{base_url}}/openapi.json` in a
-   pre-request script, pull `components.schemas.Product` out of it, and assert `List products`
-   against it.
-2. **Break the schema deliberately** — assert against `Variant` instead of `Product` — and read
-   the failure. A schema assertion that has never failed is a schema assertion you cannot
-   interpret.
-3. **Assert a business rule, not just a shape.** On `List products?sort=title&order=asc`, assert
-   the titles come back sorted. On `Archive product`, assert `archived_at` is non-null _and_
-   `status` is `archived` — the two agreeing is a real invariant the database enforces.
-4. **Assert something about the error contract.** In a new `Catalog / Error cases` folder, send
-   `?sort=password` and assert `400`, `error.code === 'VALIDATION_ERROR'`, and that
-   `error.details.fields[0].allowed` contains `created_at`.
-
-**On that last one:** you said earlier you would rather not save broken examples. The reframe is
-that a request which is _supposed_ to return 400 is not broken — it is a passing test. Green,
-not red. It matters because a happy-path-only collection proves the API works when used
-correctly and proves nothing about the error contract, which is equally published and equally
-able to regress.
-
-**What to inspect.** What does `jsonSchema()` report when it fails — the path, or just "invalid"?
-Which of your four assertions would still pass if the API returned an empty array?
-
-### Group 6 — The Collection Runner, properly
-
-You have run a folder. That is the surface of it.
-
-1. **Run the collection with iterations.** Runner → set iterations to 5. Watch `Create product`
-   run five times. Look at what happened to your `product_id` collection variable — and work out
-   why the fifth iteration's `Archive product` did not archive the first iteration's product.
-2. **Add a delay** and watch the run slow down. Then ask yourself what a delay is hiding if a
-   test only passes with one.
-3. **Persist variables after the run** and observe that the runner can leave state behind.
-4. **Export the run results** as JSON. Open the file. That structure is what a CI reporter
-   consumes, which is the whole of CP2's second half.
-
-### Group 7 — Data-driven runs
-
-The single biggest coverage multiplier in Postman, and absent from the original plan.
-
-1. **Build a data file.** A CSV with columns `sku`, `expected_status`, `description`. Include
-   seeded SKUs, a SKU that does not exist, and a malformed one.
-2. **Reference it from a request** with `{{sku}}` in the URL and `pm.iterationData.get('sku')`
-   in a script.
-3. **Assert against the expected value from the row**, not a hard-coded one:
-   `pm.response.to.have.status(Number(pm.iterationData.get('expected_status')))`.
-4. **Run it.** One request, N scenarios, one report.
-
-**Why this matters beyond convenience.** A QA lead's question is never "can you write a test",
-it is "how do you get from forty tests to four thousand without forty thousand lines". This is
-the answer, and `pm.iterationData` is the mechanism. Your seeded catalog — 20 products, 49
-variants, 45 stock levels — is a ready-made data file.
-
-### Done when you can explain
-
-- Why a request with no assertions can never fail a collection run, and what that means for a
-  green CI result.
-- What `pm.response.to.have.jsonSchema()` proves that `to.have.status(200)` does not — and what
-  it still does not prove.
-- Why a data-driven run with 200 rows is a different thing from 200 saved requests, in
-  maintenance terms and not just in effort.
-- What the Runner's exported JSON is _for_.
-
-### What CP1 does not prove
-
-Nothing here runs anywhere but your machine, on demand, when you remember. Every assertion you
-have written can be skipped by not clicking Run. That gap is exactly what CP2 closes.
+**Done when you can say:** what the Runner produces that a single send does not, and why
+data-driven runs are a coverage multiplier rather than a convenience.
 
 ---
 
-## CP2 — Gate ⭐
+## T2 — Design: Spec Hub ⬅
 
-**Objective.** Turn a collection you run into a gate that runs itself and blocks a merge. This
-is the centre of the Design → **Gate** → Validate → Monitor → Improve motion, and per your own
-ramp plan contract testing is your largest single gap.
+**What it is.** The API specification as a first-class object in Postman — versioned, linked to
+the collections generated from it, with an Issues tab.
 
-Split into **tier A** (works on any plan — do this regardless) and **tier B** (Enterprise-gated
-— confirm first, and do not plan around it).
+**Why it matters commercially.** Your spec currently lives in a git repository, so the only
+people who can see it are people who can clone it. Spec Hub is the answer to "where does the
+contract live so that design, test and documentation all point at the same thing".
 
-### Task 0 — the prerequisite nobody flagged
+**Do this:**
 
-**Your collection cannot run in CI today, and this will stop you dead at task 3.**
+1. Put `openapi/openapi.json` into Spec Hub.
+2. Generate a collection from it. Keep it separate from your hand-built one.
+3. Change something in the spec and watch the sync. Read the **Issues** tab.
 
-The auth helper reads the seeded password from **Postman Local Vault** via `pm.vault.get()`.
-Local Vault secrets are, by design, never synced anywhere — which is what makes them the right
-home for a credential, and which is also why **the Postman CLI cannot read them**. Local Vault
-supports manual runs and collection runs; Shared Vault supports the CLI, monitors, and scheduled
-runs.
+**Worth noticing:** compare the generated collection with yours. It has coverage, descriptions
+and examples you did not type. It has none of your variable choices, chaining or assertions.
+That gap is the honest answer to "can't AI just generate my tests" — and you will be asked.
 
-Three ways out, and choosing between them is the actual lesson:
+**Buyer:** Platform Engineering / API CoE. Proof point: spec and collection stay in sync, no
+manual import/export.
 
-| Option                                                                                              | Works in CI | Cost                                                                |
-| --------------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------- |
-| **Shared Vault**                                                                                    | Yes         | Team feature; the secret now lives in Postman cloud                 |
-| **Inject at run time** — `postman collection run --env-var "password=$SECRET"` from a GitHub secret | Yes         | The credential lives in GitHub, not Postman. Two places to rotate   |
-| Hard-code it in the environment                                                                     | Yes         | Never. It reaches the repository and `git rm` does not unpublish it |
-
-For a seeded fixture password the stakes are low, which makes it a good place to practise the
-decision. For a real credential the second option is usually right: the secret lives in the
-place that already manages secrets for that pipeline.
-
-### Tier A — any plan
-
-**1. Spec Hub.** Put `openapi/openapi.json` into Spec Hub. Generate a collection from it —
-separately from your hand-built one, so you can compare. Change the spec, watch the sync, and
-read the **Issues** tab.
-
-The comparison is the point. What does the generated collection give you that yours does not
-(coverage, descriptions, examples)? What does yours have that no generator could produce
-(variable choices, chaining, the assertions in group 5)? That gap is the honest answer to
-"can't AI just generate my tests".
-
-**2. Postman CLI in CI.** Add a job to the existing `.github/workflows/release.yml` — you do not
-need a second pipeline — that runs the collection with the Postman CLI and fails the build on a
-non-zero exit code. Emit **JUnit**, then try JSON and HTML and look at what each is for.
-
-Exit codes are the mechanism. A test report nobody reads is documentation; a non-zero exit code
-is a gate.
-
-**3. Ship a deliberate breaking change.** Rename a response property or add a required request
-field, on a branch. Watch the gate block the merge. **This is the demo you will give**, so run
-it until you can narrate it without looking.
-
-**4. Make a test flaky on purpose.** Add a timing-dependent assertion. Run it five times. Notice
-your own impulse to re-run rather than fix.
-
-That impulse is the whole diagnosis. A gate that gets re-run until it passes is not a gate, and
-Gate Coverage × Flake Rate is the second of the five metrics you are expected to name. Being
-able to say "your gate is muted" in one sentence in discovery is worth more than the mechanics.
-
-**5. Git-connected workspace.** You already have `.postman/resources.yaml` and the sync working.
-Understand what it is doing: the repo as the versioned source of truth rather than a manual
-export, and what happens when the two diverge.
-
-### Tier B — Enterprise only
-
-> **Confirm before planning around this.** Postman → **Team Settings → Plan**. API Governance,
-> configurable and custom rules, and API Catalog are Enterprise features. Your team
-> `justin-v12` shows Enterprise-grade limits, but limits are not the same as plan entitlement
-> and this has not been verified in-app. If the answer is no, tier A stands entirely on its own
-> and is the majority of the value.
-
-**6. Rebuild a Redocly rule as a Postman governance rule.** You already have real governance —
-`redocly.yaml` enforces `operation-operationId`, `parameter-description`, `operation-4xx-response`
-and more, and `.redocly.lint-ignore.yaml` records three reviewed exceptions rather than
-switching the rule off. That is structurally the same idea. But a customer will never ask about
-Redocly. Configure the equivalent under **API Catalog → Governance Groups**, applied to your spec
-in Spec Hub.
-
-Keep Redocly as the "what a lint rule is" teacher. Rebuild one rule in Postman as the "what the
-customer buys" version.
-
-**7. `postman spec lint` with reporting.** Verified against current docs:
-
-```bash
-postman spec lint openapi/openapi.json --workspace-id <id>
-postman spec lint <spec-id> --report-events        # on by default
-postman spec lint openapi.yaml --fail-severity WARNING --output JSON
-```
-
-Results appear in **API Catalog → your service → Test tab → CI Pipeline Runs → View report**.
-Reporting requires that the spec exists in Postman — linting a standalone local file that is not
-synced will not report.
-
-**Vocabulary trap:** `postman api lint` is the **v11 API Builder** command and is not supported
-in v12+. Use `postman spec lint`. Getting this wrong in front of a platform team is an avoidable
-tell.
-
-**8. API Catalog.** Register the service. Look at the Service Health Scorecard — test pass rates,
-spec compliance and gateway metrics aggregated in one place. This is the Management Plane, and
-it is the half of Postman this project has taught you nothing about so far.
-
-### Done when you can explain
-
-- Why a gate that can be re-run until it passes is not a gate, and what you would look at first
-  to find out whether a customer's gate is muted.
-- What the Postman CLI puts somewhere a platform team can see that Newman does not — and why
-  that difference, not a verdict about which is better, is the defensible answer.
-- Which half of API governance is Enterprise-gated, and why that boundary is a differentiator
-  rather than an inconvenience. **You can answer this from the docs whether or not tier B turns
-  out to be enabled for you** — and if it is not, being able to say precisely what you would see
-  is the deliverable.
-- The difference between a spec that is valid and a spec that is good, and which tool catches
-  which.
-
-### What CP2 does not prove
-
-A gate proves a change did not break what you thought to assert. It says nothing about what you
-did not think of, nothing about behaviour under load, and nothing about whether the API is
-useful. It also proves nothing about production: everything here runs against a build, not
-against the deployed instance. That is CP4.
+**Done when you can say:** what Spec Hub gives you that a spec file in a repo does not.
 
 ---
 
-## CP3 — Validate
+## T3 — Gate: Postman CLI, CI, governance
 
-**Objective.** Reuse and simulation. Runs after M3A, so there is an idempotent endpoint and a
-state machine to build a real workflow against.
+The centre of the Design → **Gate** → Validate → Monitor → Improve motion, and the thing your
+own ramp plan stars as your largest gap.
 
-### Task groups
+**First, a blocker.** Your auth helper reads the password from **Postman Local Vault**, and the
+Postman CLI cannot read Local Vault. Pick one:
 
-**1. Package Library.** Publish one reusable module — an auth helper or a standard
-schema-and-error assertion — and consume it from more than one collection.
+| Option                                           | Cost                                                      |
+| ------------------------------------------------ | --------------------------------------------------------- |
+| **Shared Vault**                                 | Team feature; secret lives in Postman cloud               |
+| **`--env-var` at run time** from a GitHub secret | Two places to rotate. Usually right for a real credential |
 
-Do this even though your collection is small, because **Package Adoption Rate is the first of
-the five metrics you are expected to name**, and you cannot talk credibly about a metric whose
-mechanism you have never used.
+**Do this:**
 
-**2. Mock servers, both kinds.** The distinction matters and the old framing is stale:
+1. `postman login`, then `postman collection run <id>` locally. Watch it pass.
+2. Add `--reporters junit` and look at the file. That is what a CI system reads.
+3. Add a job to the existing `.github/workflows/release.yml`. Non-zero exit code fails the
+   build.
+4. Break something on a branch — rename a response field — and watch the gate block it. **This
+   is the demo you will give.**
+5. _(Enterprise)_ `postman spec lint openapi/openapi.json`. Rebuild one `redocly.yaml` rule as a
+   Postman governance rule under **API Catalog → Governance Groups**.
 
-|                    | Example-based mock          | Code-based local mock                                  |
-| ------------------ | --------------------------- | ------------------------------------------------------ |
-| Responses          | Static, from saved examples | Dynamic — any JavaScript                               |
-| Runs               | Postman cloud, always on    | Locally, or deployed                                   |
-| State              | None                        | Yes, via `pm.state` (beta)                             |
-| CI                 | Via a collection run        | `postman mock run`, as a dependency of your test suite |
-| Failure simulation | No                          | Scenarios: latency, errors, rate limits, chaos mode    |
+**Vocabulary trap:** `postman api lint` is the v11 API Builder command, not supported in v12+.
+Use `postman spec lint`. Getting this wrong in front of a platform team is an avoidable tell.
 
-Build the example-based one from your OpenAPI examples. Then build a code-based local mock that
-does something the static one structurally cannot — return a different response on the second
-call, or inject a 503 — and run your collection against it with `postman collection run --mock`.
+**On Newman, don't overclaim.** It is not deprecated — Postman still ships full Newman docs and
+plenty of QA leads run it in Jenkins. The defensible line is the difference, not a verdict:
+_"Newman runs the collection. The Postman CLI runs it and puts the result somewhere your
+platform team can see — which is the difference between a test and a gate with evidence."_
 
-**3. `pm.execution.setNextRequest()`.** Branch inside a run: if inventory is insufficient, skip
-the order and jump to the cleanup request. This is how a collection stops being a straight line.
+**Buyer:** Platform Engineering, QA lead.
 
-**4. The end-to-end chain.** Authenticate → find a product → check inventory → reserve → price it
-→ place the order → release on failure. Every step feeding the next from a captured variable.
-
-### Done when you can explain
-
-- What a mock proves and what it structurally cannot — and why "mocks are stateless and cannot
-  surprise you" stopped being true in 2026.
-- Why publishing a package once beats copying an auth check into forty collections, in terms a
-  platform lead cares about rather than a developer.
-- When branching in a run is the right answer and when it means your collection is doing a job
-  that belongs in the API.
+**Done when you can say:** what the Postman CLI does that Newman does not, and why a gate that
+can be re-run until it passes is not a gate.
 
 ---
 
-## CP4 — Monitor
+## T4 — Catalog and discovery
 
-**Prerequisite: the Unraid deployment, live and reachable.** A monitor against `127.0.0.1` is
-meaningless. This is the checkpoint the deployment exists for.
+**Enterprise-gated. Confirm your plan first.** If the answer is no, this becomes a reading tour —
+and the vocabulary below is the part that actually gets asked about.
 
-**1. A cloud monitor** against the deployed instance. Schedule it, break the API deliberately,
-watch it catch that.
+**The distinction to get right**, named as the primary field confusion:
 
-**2. Monitor Runners.** Your Unraid box is behind home NAT and unreachable from Postman's cloud.
-That is the same shape as the named gap in your ramp plan — _"our APIs are internal, behind the
-firewall, on EKS"_ — and Monitor Runners exist precisely for it.
+|                         | Answers                                        | Audience      |
+| ----------------------- | ---------------------------------------------- | ------------- |
+| **API Catalog**         | "What do we operate, and is it healthy?"       | **Producers** |
+| **Private API Network** | "Does something already exist that does this?" | **Consumers** |
 
-You will have the real problem on your own hardware rather than a described one. Reasoning
-toward that answer in an interview is not the same as having hit it.
+Read as one feature they sound redundant. They are not.
 
-**3. Alert routing** to Slack, Jira or PagerDuty. An alert nobody receives is a log line.
+**Do this:** register Acme Commerce as a service in the Catalog. Look at the Service Health
+Scorecard — test pass rates, spec compliance and gateway metrics in one view. If T3 step 5 ran
+with reporting on, your lint results are already there under **Test → CI Pipeline Runs**.
 
-**4. Synthetic coverage.** Which of your endpoints does a monitor actually cover, and which
-failures would it never see?
+Then publish the API to the Private API Network and search for it as a consumer would.
 
-**Performance testing is concept-only.** Your team has `perf_test_milli_vuh` at 0, so cloud
-performance runs are unavailable. Know the four profiles — Fixed, Ramp, Spike, Peak VU — and
-what each is for; there is no task here to perform, and a checkpoint containing an unperformable
-task is worse than an honest gap. See `LEARNING_GUIDE.md`.
+**Buyer:** Platform Engineering. PAN is described as the "aha" feature for platform leads.
 
-### Done when you can explain
-
-- Why a monitor against localhost is meaningless, and exactly what Monitor Runners solve that a
-  cloud monitor cannot.
-- The difference between a monitor and a gate — same collection, different question.
-- Which of the four performance profiles you would reach for to answer "will Black Friday break
-  us", and why the other three answer different questions.
+**Done when you can say:** the Catalog/PAN distinction without hedging, and what a health
+scorecard aggregates.
 
 ---
 
-## M6 — Management Plane (non-build)
+## T5 — Identity and security
 
-Reading and access, not building. A local project cannot teach these, and no amount of milestone
-work will change that.
+Mostly Enterprise, and mostly the Security/IT buyer — a persona this project has given you
+nothing for so far.
 
-- **API Catalog vs Private API Network.** Producers versus consumers. Named as the primary field
-  confusion; five minutes to learn and high embarrassment cost to get wrong.
-- **Service accounts** and their specific failure modes: personal PMAKs return 401 at token
-  minting; an org-level Admin role still 403s at workspace create without a sub-team role;
-  Workspace Management Settings allowlists override roles independently.
-- **The three-plane model**, the five FY27 motions, and the reframe verbatim.
-- **The five metrics** — Package Adoption, Gate × Flake, DER, MTTD, CFR — and what "broken" looks
-  like for each.
-- **SSO / SCIM / Domain Capture / RBAC / audit logs / Secret Scanner / Vault / BYOK**, and the
-  Enterprise versus ASA commercial line.
-- **What not to say:** "Postman is a better Insomnia", "Postman is where you test APIs".
+**Touch these:**
 
-### Done when you can explain
+1. **Vault.** You use Local Vault already. Understand the boundary: Local never syncs and is
+   invisible to the CLI and monitors; Shared reaches them and lives in the cloud.
+2. **Service accounts.** A non-human CI identity with its own short-lived token and audit trail,
+   so a pipeline is not running as someone who might leave. Create one if you can.
+3. **Workspace roles / RBAC.** Look at the roles available on a workspace and what each permits.
 
-- The difference between API Catalog and Private API Network without hedging.
-- Why a service account is a security control and not a convenience.
-- Each of the five metrics, and one concrete symptom of each being broken.
+**Read, don't build:** SSO, SCIM, Domain Capture, audit logs, Secret Scanner, BYOK — and the
+Enterprise versus ASA commercial line.
+
+**Failure modes worth knowing before you hit them:** a personal API key returns **401** at token
+minting, not a warning. An org-level Admin role still **403s** at workspace create without a role
+on the specific sub-team. Workspace Management Settings allowlists override roles independently,
+so granting a role does not clear them.
+
+**Buyer:** Security / IT Administration. Demo order: SSO/SCIM → Domain Capture → audit log export
+→ Secret Scanner → Vault → service account for CI.
+
+**Done when you can say:** why a service account is a security control rather than a
+convenience, and which of Local/Shared Vault a monitor can read.
+
+---
+
+## T6 — Simulate and observe
+
+**Mocks — two kinds, and the old framing is stale.**
+
+|                    | Example-based               | Code-based local                               |
+| ------------------ | --------------------------- | ---------------------------------------------- |
+| Responses          | Static, from saved examples | Dynamic — any JavaScript                       |
+| Runs               | Postman cloud, always on    | Locally, or deployed                           |
+| State              | None                        | Yes, via `pm.state`                            |
+| In CI              | Via a collection run        | `postman mock run`, as a test dependency       |
+| Failure simulation | No                          | Scenarios: latency, errors, rate limits, chaos |
+
+Build the example-based one from your OpenAPI examples. Then look at what a code-based mock can
+do that it cannot — that capability is why "mocks are just static examples" is now a wrong
+answer.
+
+**Monitors.** Schedule one against `http://10.0.1.7:3001`. Break the API and watch it catch that.
+Route an alert to Slack.
+
+**Monitor Runners** — the one worth the most to you. Your Unraid box is behind home NAT and
+unreachable from Postman's cloud. That is the same shape as the named gap in your ramp plan:
+_"our APIs are internal, behind the firewall, on EKS."_ You have the real problem on your own
+hardware. Solve it once and you can describe it rather than reason toward it.
+
+**Performance: concept only.** Your team has `perf_test_milli_vuh` at 0, so there is nothing to
+run. Know the four profiles and what each answers — Fixed (normal load), Ramp (where it
+degrades), Spike (flash sale and recovery), Peak (will Black Friday break us).
+
+**Buyer:** Product Engineering (mocks), Platform Engineering (monitors).
+
+**Done when you can say:** what a code-based mock does that a static one cannot, and exactly what
+Monitor Runners solve.
+
+---
+
+## T7 — Collaborate and distribute
+
+**Touch these:**
+
+1. **Workspace types** — personal, team, partner, public. What changes between them.
+2. **Fork and pull request.** Fork your collection, change it, open a PR, merge it. API
+   governance using a review model developers already know.
+3. **Git-connected workspace.** You have this working. Understand what it changes: the repo as
+   source of truth rather than a place exports land.
+4. **Published documentation.** Publish your collection's docs and look at the result.
+5. **Partner Workspaces** _(if Enterprise)_ — publish once, fork many, partners stay in sync.
+
+**Buyer:** Partner / API Product Owners, and Platform Engineering for the fork/PR model.
+
+**Done when you can say:** when a partner workspace beats a public one, and what the fork/PR flow
+gives an API team that a shared workspace does not.
+
+---
+
+## After the tours
+
+Non-build reading, no hands-on possible: the three-plane model · the five FY27 motions · the five
+metrics (Package Adoption, Gate × Flake, DER, MTTD, CFR) and what broken looks like for each ·
+what not to say ("Postman is a better Insomnia", "Postman is where you test APIs").
+
+**Depth, if and where you want it.** Package Library at T3 or T7, Postman Flows, `setNextRequest`
+branching, and the idempotency/webhook build milestones. All optional, all worth more once the
+breadth is in place.

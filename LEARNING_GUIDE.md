@@ -8,18 +8,16 @@ This guide grows with the build. Sequence revised 2026-09-14 — see
 [`docs/CHECKPOINTS.md`](docs/CHECKPOINTS.md), which holds the checkpoint tasks and their
 done-when conditions. This guide explains the concepts; that document says what to do with them.
 
-| Milestone / checkpoint | Topics added                                                                                                                                                                                    |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **M1A** ✅             | _(build — the Catalog API every concept below is explored against)_                                                                                                                             |
-| **CP1** 🔨             | HTTP request anatomy · collection endpoints · API contracts · error design · request correlation · testing levels · environments · **schema assertions · Collection Runner · data-driven runs** |
-| **M2A** ✅             | Authentication · authorization · roles · permissions · 401 vs 403 · token anatomy · local vs shared secrets                                                                                     |
-| **CP2** ⬅              | **The gate** · Spec Hub · governance rules · Postman CLI in CI · exit codes and reporters · deliberate breaking changes · flake · Git-connected workspaces                                      |
-| M3A                    | Idempotency · state machines                                                                                                                                                                    |
-| CP3                    | Package Library · mocks, static and code-based · branching in a run · end-to-end chains                                                                                                         |
-| M4A                    | Webhooks · delivery, retries, signatures                                                                                                                                                        |
-| CP4                    | Monitors · Monitor Runners behind a firewall · alert routing · performance profiles (concept)                                                                                                   |
-| M5A                    | Versioning · deprecation · breaking changes                                                                                                                                                     |
-| M6                     | The Management Plane: API Catalog vs Private API Network · service accounts · the five metrics                                                                                                  |
+| Tour   | Concepts in this guide                                                                                 |
+| ------ | ------------------------------------------------------------------------------------------------------ |
+| **T1** | §1 request anatomy · §2 collection endpoints · §3 contracts · §4 errors · §6 testing · §7 environments |
+| **T2** | §3 contracts · §10 Spec Hub                                                                            |
+| **T3** | §10 governance rules, Postman CLI, Newman comparison                                                   |
+| **T4** | §10 API Catalog vs Private API Network, health scorecards                                              |
+| **T5** | §5 auth · §7 Vault · §10 service accounts                                                              |
+| **T6** | §8 mocking · §10 monitors and Monitor Runners · §11 performance                                        |
+| **T7** | §10 Git-connected workspaces, forking and pull requests                                                |
+| —      | §9 idempotency, webhooks, versioning — build milestones, now on demand                                 |
 
 Topics marked "not yet" below are placeholders on purpose — a forward reference is more honest
 than pretending the subject does not exist.
