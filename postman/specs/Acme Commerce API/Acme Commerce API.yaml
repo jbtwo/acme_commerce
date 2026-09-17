@@ -1,0 +1,3551 @@
+components:
+  schemas:
+    AdjustmentRequest:
+      additionalProperties: false
+      description: Increase, decrease, or correct stock at one location.
+      example:
+        location_id: loc_...
+        quantity_delta: 25
+        reason: received
+        reference: PO-4471
+        sku: ACME-BAG-BLK
+      properties:
+        location_id:
+          description: Which location to adjust.
+          pattern: ^loc_[0-9a-f]{24}$
+          type: string
+        quantity_delta:
+          description: Signed change. Positive adds, negative removes. Zero is rejected — an adjustment that changes nothing is a client bug, not a no-op worth recording.
+          example: 25
+          type: integer
+        reason:
+          description: Required. Closed set so the audit log can be grouped and reported on.
+          enum:
+            - received
+            - sold
+            - damaged
+            - correction
+            - transfer_in
+            - transfer_out
+            - return
+          type: string
+        reference:
+          description: Optional PO number, order id, or ticket.
+          maxLength: 200
+          type: string
+        sku:
+          description: Stock-keeping unit.
+          example: ACME-BAG-BLK
+          maxLength: 64
+          minLength: 1
+          type: string
+      required:
+        - sku
+        - location_id
+        - quantity_delta
+        - reason
+      title: AdjustmentRequest
+      type: object
+    AdjustmentResponse:
+      additionalProperties: false
+      description: The adjustment recorded, and the level it produced.
+      properties:
+        data:
+          additionalProperties: false
+          properties:
+            adjustment:
+              $ref: "#/components/schemas/InventoryAdjustment"
+            level:
+              additionalProperties: false
+              description: The resulting level, so no follow-up read is needed.
+              properties:
+                available:
+                  description: Available after the adjustment.
+                  type: integer
+                location_id:
+                  description: The location.
+                  type: string
+                on_hand:
+                  description: On hand after the adjustment.
+                  type: integer
+                reserved:
+                  description: Reserved after the adjustment.
+                  type: integer
+                sku:
+                  description: The SKU.
+                  type: string
+              required:
+                - sku
+                - location_id
+                - on_hand
+                - reserved
+                - available
+              type: object
+          required:
+            - adjustment
+            - level
+          type: object
+      required:
+        - data
+      title: AdjustmentResponse
+      type: object
+    Error:
+      additionalProperties: false
+      description: The single error shape returned by every Acme Commerce API error response.
+      example:
+        error:
+          code: VALIDATION_ERROR
+          details:
+            fields:
+              - field: body.title
+                message: '"title" is required.'
+                rule: required
+          message: The request body is invalid.
+          request_id: req_18f3a9c4e21b7d05f6a3b8c1
+      properties:
+        error:
+          additionalProperties: false
+          properties:
+            code:
+              description: Stable machine-readable error code. Branch on this, never on `message`. The full list is documented in README.md.
+              example: SKU_ALREADY_EXISTS
+              type: string
+            details:
+              additionalProperties: true
+              description: "Optional structured context. Its shape depends on `code`: `VALIDATION_ERROR` carries a `fields` array, `MALFORMED_ID` carries `expected_pattern`, `SKU_ALREADY_EXISTS` carries the conflicting `sku`."
+              properties: {}
+              type: object
+            message:
+              description: Human-readable explanation, for a log or a response pane. May be reworded in any release; it is not part of the contract.
+              type: string
+            request_id:
+              description: Correlation identifier for this request, also returned in the `X-Request-Id` response header. Quote it when reporting a problem — it is what locates the server-side log lines.
+              example: req_18f3a9c4e21b7d05f6a3b8c1
+              type: string
+          required:
+            - code
+            - message
+            - request_id
+          type: object
+      required:
+        - error
+      title: Error
+      type: object
+    HealthResponse:
+      additionalProperties: false
+      description: Liveness. Answered from process state alone; no dependency is contacted.
+      properties:
+        environment:
+          description: "Configured APP_ENV: development, test, or production."
+          type: string
+        service:
+          description: Service name, for when several services share a log stream.
+          type: string
+        status:
+          description: Always "ok". If the process could not answer, you would get no response at all.
+          enum:
+            - ok
+          type: string
+        uptime_seconds:
+          description: Seconds since this process started. A resetting value means it is crash-looping.
+          type: number
+        version:
+          description: Deployed application version. Use it to confirm an image update took effect.
+          type: string
+      required:
+        - status
+        - service
+        - version
+        - environment
+        - uptime_seconds
+      title: HealthResponse
+      type: object
+    HistoryResponse:
+      additionalProperties: false
+      description: A page of inventory adjustments.
+      properties:
+        data:
+          description: A page of audit-log entries, newest first.
+          items:
+            $ref: "#/components/schemas/InventoryAdjustment"
+          type: array
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+      required:
+        - data
+        - pagination
+      title: HistoryResponse
+      type: object
+    Identity:
+      additionalProperties: false
+      description: The authenticated caller, as the server currently understands them.
+      properties:
+        email:
+          description: Email address.
+          type: string
+        id:
+          description: User identifier. Appears as the `sub` claim in the token.
+          type: string
+        name:
+          description: Display name.
+          type: string
+        permissions:
+          description: Every permission this role holds. What a 403 is checked against.
+          items:
+            description: A single capability, in `domain:action` form.
+            enum:
+              - catalog:read
+              - catalog:write
+              - locations:read
+              - locations:write
+              - inventory:read
+              - inventory:write
+              - pricing:read
+            type: string
+          type: array
+        role:
+          description: Internal role. Determines the permission set; permissions are derived from the role at request time, never carried inside the token.
+          enum:
+            - developer
+            - support
+            - admin
+          type: string
+        token_expires_at:
+          description: When the presented token stops being accepted.
+          format: date-time
+          type: string
+      required:
+        - id
+        - email
+        - name
+        - role
+        - permissions
+        - token_expires_at
+      title: Identity
+      type: object
+    IdentityResponse:
+      additionalProperties: false
+      description: The identity behind the presented token.
+      properties:
+        data:
+          $ref: "#/components/schemas/Identity"
+      required:
+        - data
+      title: IdentityResponse
+      type: object
+    InventoryAdjustment:
+      additionalProperties: false
+      description: One entry in the append-only stock audit log.
+      properties:
+        actor:
+          description: Who did it — taken from the bearer token, never from the body.
+          type: string
+        created_at:
+          description: When. Append-only; never updated.
+          format: date-time
+          type: string
+        id:
+          description: Adjustment identifier.
+          pattern: ^invadj_[0-9a-f]{24}$
+          type: string
+        location_id:
+          description: Where.
+          type: string
+        location_name:
+          description: Location name, on history responses.
+          type: string
+        quantity_delta:
+          description: Signed change. Negative removes stock.
+          type: integer
+        reason:
+          description: Why the stock moved. A closed set so history can be grouped.
+          enum:
+            - received
+            - sold
+            - damaged
+            - correction
+            - transfer_in
+            - transfer_out
+            - return
+          type: string
+        reference:
+          description: Free-text link to a PO, order, or ticket.
+          type:
+            - "null"
+            - string
+        sku:
+          description: The SKU adjusted.
+          type: string
+      required:
+        - id
+        - sku
+        - location_id
+        - quantity_delta
+        - reason
+        - reference
+        - actor
+        - created_at
+      title: InventoryAdjustment
+      type: object
+    InventoryLevel:
+      additionalProperties: false
+      description: Stock for one SKU at one location.
+      properties:
+        available:
+          description: "What can still be reserved or sold: `on_hand - reserved`. **Computed, never stored** — a third stored number is the first thing to disagree with the other two."
+          type: integer
+        location_id:
+          description: Where the stock is.
+          pattern: ^loc_[0-9a-f]{24}$
+          type: string
+        location_name:
+          description: Location name, so a response is readable without a second call.
+          type: string
+        on_hand:
+          description: Units physically present.
+          minimum: 0
+          type: integer
+        reserved:
+          description: Units held by active reservations.
+          minimum: 0
+          type: integer
+        sku:
+          description: The SKU this level is for.
+          type: string
+        updated_at:
+          description: When this level last changed.
+          format: date-time
+          type: string
+      required:
+        - sku
+        - location_id
+        - location_name
+        - on_hand
+        - reserved
+        - available
+        - updated_at
+      title: InventoryLevel
+      type: object
+    InventoryListResponse:
+      additionalProperties: false
+      description: A page of inventory levels.
+      properties:
+        data:
+          description: A page of stock levels.
+          items:
+            $ref: "#/components/schemas/InventoryLevel"
+          type: array
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+      required:
+        - data
+        - pagination
+      title: InventoryListResponse
+      type: object
+    InventoryReservation:
+      additionalProperties: false
+      description: A temporary hold on stock.
+      properties:
+        actor:
+          description: Who reserved it.
+          type: string
+        created_at:
+          description: When it was created.
+          format: date-time
+          type: string
+        expires_at:
+          description: After this, the hold lapses and the stock returns.
+          format: date-time
+          type: string
+        id:
+          description: Reservation identifier.
+          pattern: ^invres_[0-9a-f]{24}$
+          type: string
+        location_id:
+          description: Where the stock is held.
+          type: string
+        quantity:
+          description: Units held.
+          minimum: 1
+          type: integer
+        reference:
+          description: Free-text link to a cart or order.
+          type:
+            - "null"
+            - string
+        released_at:
+          description: When it was released or expired. Null while active.
+          format: date-time
+          type:
+            - "null"
+            - string
+        sku:
+          description: The SKU held.
+          type: string
+        status:
+          description: Lifecycle state. `expired` is reported as soon as `expires_at` passes, whether or not the stock has been swept back yet.
+          enum:
+            - active
+            - released
+            - expired
+          type: string
+      required:
+        - id
+        - sku
+        - location_id
+        - quantity
+        - status
+        - reference
+        - actor
+        - expires_at
+        - released_at
+        - created_at
+      title: InventoryReservation
+      type: object
+    Location:
+      additionalProperties: false
+      description: A place where inventory is held.
+      properties:
+        address_line1:
+          description: Street address. Null for a virtual location.
+          maxLength: 200
+          type:
+            - "null"
+            - string
+        address_line2:
+          description: Unit, suite, or floor.
+          maxLength: 200
+          type:
+            - "null"
+            - string
+        city:
+          description: City.
+          maxLength: 100
+          type:
+            - "null"
+            - string
+        country:
+          description: ISO 3166-1 alpha-2 country code, uppercase.
+          maxLength: 2
+          type:
+            - "null"
+            - string
+        created_at:
+          description: RFC 3339 creation timestamp.
+          format: date-time
+          type: string
+        id:
+          description: Server-assigned identifier.
+          pattern: ^loc_[0-9a-f]{24}$
+          type: string
+        is_active:
+          description: Whether the location is in use. Locations are never deleted — inventory history references them — so retiring one means setting this to false.
+          type: boolean
+        name:
+          description: Human-readable name. Unique, case-insensitively.
+          maxLength: 100
+          minLength: 1
+          type: string
+        postal_code:
+          description: Postal or ZIP code.
+          maxLength: 20
+          type:
+            - "null"
+            - string
+        region:
+          description: Province, state, or region.
+          maxLength: 100
+          type:
+            - "null"
+            - string
+        type:
+          description: Kind of location. `warehouse` fulfils orders, `retail` is a physical store, `virtual` covers dropship and in-transit stock that has no address.
+          enum:
+            - warehouse
+            - retail
+            - virtual
+          type: string
+        updated_at:
+          description: RFC 3339 last-modified timestamp.
+          format: date-time
+          type: string
+      required:
+        - id
+        - name
+        - type
+        - address_line1
+        - address_line2
+        - city
+        - region
+        - postal_code
+        - country
+        - is_active
+        - created_at
+        - updated_at
+      title: Location
+      type: object
+    LocationCreate:
+      additionalProperties: false
+      description: Body for creating an inventory location.
+      example:
+        address_line1: 3020 Centre Street NE
+        city: Calgary
+        country: CA
+        name: Calgary Warehouse
+        postal_code: T2E 2X7
+        region: AB
+        type: warehouse
+      properties:
+        address_line1:
+          description: Street address.
+          maxLength: 200
+          type: string
+        address_line2:
+          description: Unit or suite.
+          maxLength: 200
+          type: string
+        city:
+          description: City.
+          maxLength: 100
+          type: string
+        country:
+          description: ISO 3166-1 alpha-2, uppercase.
+          pattern: ^[A-Z]{2}$
+          type: string
+        is_active:
+          default: true
+          description: Defaults to true.
+          type: boolean
+        name:
+          description: Required. Must be unique.
+          maxLength: 100
+          minLength: 1
+          type: string
+        postal_code:
+          description: Postal or ZIP code.
+          maxLength: 20
+          type: string
+        region:
+          description: Province or state.
+          maxLength: 100
+          type: string
+        type:
+          description: Kind of location. `warehouse` fulfils orders, `retail` is a physical store, `virtual` covers dropship and in-transit stock that has no address.
+          enum:
+            - warehouse
+            - retail
+            - virtual
+          type: string
+      required:
+        - name
+        - type
+      title: LocationCreate
+      type: object
+    LocationListResponse:
+      additionalProperties: false
+      description: A page of locations with pagination metadata.
+      properties:
+        data:
+          description: The requested page of locations.
+          items:
+            $ref: "#/components/schemas/Location"
+          type: array
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+      required:
+        - data
+        - pagination
+      title: LocationListResponse
+      type: object
+    LocationResponse:
+      additionalProperties: false
+      description: A single location.
+      properties:
+        data:
+          $ref: "#/components/schemas/Location"
+      required:
+        - data
+      title: LocationResponse
+      type: object
+    LocationUpdate:
+      additionalProperties: false
+      description: Partial update. Omitted properties are unchanged; explicit null clears one.
+      example:
+        is_active: false
+      minProperties: 1
+      properties:
+        address_line1:
+          description: New street address; null clears it.
+          maxLength: 200
+          type:
+            - string
+            - "null"
+        address_line2:
+          description: New unit or suite; null clears it.
+          maxLength: 200
+          type:
+            - string
+            - "null"
+        city:
+          description: New city; null clears it.
+          maxLength: 100
+          type:
+            - string
+            - "null"
+        country:
+          description: New ISO 3166-1 alpha-2 code; null clears it.
+          pattern: ^[A-Z]{2}$
+          type:
+            - string
+            - "null"
+        is_active:
+          description: Set false to retire the location without deleting it.
+          type: boolean
+        name:
+          description: New name.
+          maxLength: 100
+          minLength: 1
+          type: string
+        postal_code:
+          description: New postal code; null clears it.
+          maxLength: 20
+          type:
+            - string
+            - "null"
+        region:
+          description: New region; null clears it.
+          maxLength: 100
+          type:
+            - string
+            - "null"
+        type:
+          description: Kind of location. `warehouse` fulfils orders, `retail` is a physical store, `virtual` covers dropship and in-transit stock that has no address.
+          enum:
+            - warehouse
+            - retail
+            - virtual
+          type: string
+      title: LocationUpdate
+      type: object
+    Pagination:
+      additionalProperties: false
+      description: Offset pagination metadata, present on every collection response.
+      properties:
+        limit:
+          description: The page size that was applied.
+          minimum: 1
+          type: integer
+        page:
+          description: The page that was returned.
+          minimum: 1
+          type: integer
+        total:
+          description: Total records matching the filters, across all pages.
+          minimum: 0
+          type: integer
+        total_pages:
+          description: Number of pages at this `limit`. Zero when `total` is zero — not one empty page.
+          minimum: 0
+          type: integer
+      required:
+        - page
+        - limit
+        - total
+        - total_pages
+      title: Pagination
+      type: object
+    PriceAdjustment:
+      additionalProperties: false
+      description: One pricing rule and what it did.
+      properties:
+        amount_cents:
+          description: Signed change this rule made to the running subtotal, in minor units. Negative is a discount. Zero when `applied` is false.
+          type: integer
+        applied:
+          description: Whether the rule actually changed the price.
+          type: boolean
+        description:
+          description: Human-readable rule name, safe to show a customer.
+          type: string
+        rule_id:
+          description: The pricing rule considered.
+          type: string
+        skipped_reason:
+          description: Why the rule did not apply. Null when it did. Rules that were considered and skipped are reported deliberately — "the wholesale discount exists and you did not get it because you sent no customer_id" is the answer a support engineer needs.
+          type:
+            - "null"
+            - string
+        type:
+          description: "Rule kind: sale, customer_group, quantity_break, or partner."
+          type: string
+      required:
+        - rule_id
+        - type
+        - description
+        - amount_cents
+        - applied
+        - skipped_reason
+      title: PriceAdjustment
+      type: object
+    PriceQuote:
+      additionalProperties: false
+      description: An effective price with its full derivation. Rules apply in ascending priority, each against the running subtotal rather than the base price — so two 10% discounts compound to 19%, not 20%. Each step rounds to a whole minor unit, half away from zero.
+      properties:
+        adjustments:
+          description: Every rule considered, in the order applied (ascending priority). Applied and skipped rules are both present.
+          items:
+            $ref: "#/components/schemas/PriceAdjustment"
+          type: array
+        applied_rule_ids:
+          description: Just the rules that applied, for logging or audit.
+          items:
+            type: string
+          type: array
+        base_price_cents:
+          description: The variant list price before any rule.
+          type: integer
+        currency:
+          description: ISO 4217 code. This API does not convert currencies.
+          type: string
+        effective_unit_price_cents:
+          description: Price for one unit after every applicable rule. Equals `base_price_cents` plus the sum of `amount_cents` — the breakdown always reconciles exactly.
+          type: integer
+        quantity:
+          description: Quantity the quote was calculated for.
+          minimum: 1
+          type: integer
+        sku:
+          description: The SKU priced.
+          type: string
+        total_price_cents:
+          description: "`effective_unit_price_cents` × `quantity`."
+          type: integer
+      required:
+        - sku
+        - currency
+        - quantity
+        - base_price_cents
+        - adjustments
+        - effective_unit_price_cents
+        - total_price_cents
+        - applied_rule_ids
+      title: PriceQuote
+      type: object
+    PriceQuoteResponse:
+      additionalProperties: false
+      description: An effective price and how it was reached.
+      properties:
+        data:
+          $ref: "#/components/schemas/PriceQuote"
+      required:
+        - data
+      title: PriceQuoteResponse
+      type: object
+    Product:
+      additionalProperties: false
+      description: A sellable item in the Acme Commerce catalog. A product carries merchandising information; the purchasable units with SKUs and prices are its variants.
+      properties:
+        archived_at:
+          description: When the product was archived. Non-null exactly when `status` is `archived`.
+          format: date-time
+          type:
+            - "null"
+            - string
+        created_at:
+          description: RFC 3339 timestamp of creation, in UTC. Immutable.
+          example: 2025-01-14T15:20:00.000Z
+          format: date-time
+          type: string
+        description:
+          description: Long-form product description. Null when none has been written.
+          maxLength: 5000
+          type:
+            - "null"
+            - string
+        id:
+          description: Server-assigned product identifier. Always `prod_` followed by 24 lowercase hex characters. Assigned by the API; never constructed by a client.
+          example: prod_7ebf51270d4d3de9f7acad4c
+          pattern: ^prod_[0-9a-f]{24}$
+          type: string
+        product_type:
+          description: Merchandising category, e.g. "Backpacks". Filterable via `product_type`.
+          maxLength: 100
+          type:
+            - "null"
+            - string
+        status:
+          description: Publication state. `draft` is not customer-visible, `active` is for sale, `archived` is retired but retained so historical orders remain meaningful.
+          enum:
+            - draft
+            - active
+            - archived
+          type: string
+        tags:
+          description: Free-form labels used for merchandising. Filterable one at a time via `tag`. Always an array; an untagged product has `[]`, never null.
+          example:
+            - outdoor
+            - hiking
+            - bestseller
+          items:
+            maxLength: 50
+            minLength: 1
+            type: string
+          maxItems: 50
+          type: array
+        title:
+          description: Customer-facing product name.
+          example: Trailhead 30L Backpack
+          maxLength: 200
+          minLength: 1
+          type: string
+        updated_at:
+          description: RFC 3339 timestamp of the most recent change, in UTC. Maintained by a database trigger, so it cannot be left stale by application code that forgets to set it.
+          format: date-time
+          type: string
+        vendor:
+          description: Brand or supplier. Filterable via the `vendor` query parameter (case-insensitive exact match).
+          maxLength: 100
+          type:
+            - "null"
+            - string
+      required:
+        - id
+        - title
+        - description
+        - status
+        - vendor
+        - product_type
+        - tags
+        - created_at
+        - updated_at
+        - archived_at
+      title: Product
+      type: object
+    ProductCreate:
+      additionalProperties: false
+      description: Body for creating a product. Unknown properties are REJECTED with 400 rather than ignored — a silently-dropped `titel` is a typo that ships to production believing it worked.
+      example:
+        description: A 2.5-layer shell that stuffs into its own pocket.
+        product_type: Apparel
+        status: active
+        tags:
+          - waterproof
+          - lightweight
+        title: Riverbend Packable Rain Jacket
+        vendor: Acme
+      properties:
+        description:
+          description: Optional long-form description.
+          maxLength: 5000
+          type: string
+        product_type:
+          description: Optional merchandising category.
+          maxLength: 100
+          minLength: 1
+          type: string
+        status:
+          default: draft
+          description: Optional. Defaults to `draft`, so a new product is not accidentally live.
+          enum:
+            - draft
+            - active
+            - archived
+          type: string
+        tags:
+          description: Optional labels. Defaults to an empty array.
+          items:
+            maxLength: 50
+            minLength: 1
+            type: string
+          maxItems: 50
+          type: array
+        title:
+          description: Required. Customer-facing product name.
+          maxLength: 200
+          minLength: 1
+          type: string
+        vendor:
+          description: Optional brand or supplier.
+          maxLength: 100
+          minLength: 1
+          type: string
+      required:
+        - title
+      title: ProductCreate
+      type: object
+    ProductListResponse:
+      additionalProperties: false
+      description: A page of products plus the pagination metadata needed to fetch the rest.
+      properties:
+        data:
+          description: The requested page of products. Empty when nothing matches.
+          items:
+            $ref: "#/components/schemas/Product"
+          type: array
+        pagination:
+          $ref: "#/components/schemas/Pagination"
+      required:
+        - data
+        - pagination
+      title: ProductListResponse
+      type: object
+    ProductResponse:
+      additionalProperties: false
+      description: A single product.
+      properties:
+        data:
+          $ref: "#/components/schemas/Product"
+      required:
+        - data
+      title: ProductResponse
+      type: object
+    ProductUpdate:
+      additionalProperties: false
+      description: Partial update. Only the properties you send are changed. An omitted property is left alone; an explicit null clears a nullable property. Those are genuinely different operations, which is the whole reason PATCH exists rather than PUT. An empty body is rejected with 400 — it is far more often a client bug than a deliberate no-op.
+      example:
+        status: active
+        tags:
+          - outdoor
+          - bestseller
+      minProperties: 1
+      properties:
+        description:
+          description: New description. Send null to clear it.
+          maxLength: 5000
+          type:
+            - string
+            - "null"
+        product_type:
+          description: New product type. Send null to clear it.
+          maxLength: 100
+          type:
+            - string
+            - "null"
+        status:
+          description: New publication state. Setting `archived` here is equivalent to calling DELETE; moving away from `archived` un-archives the product and clears `archived_at`.
+          enum:
+            - draft
+            - active
+            - archived
+          type: string
+        tags:
+          description: Replaces the entire tag array. This is not a merge; send the full list.
+          items:
+            maxLength: 50
+            minLength: 1
+            type: string
+          maxItems: 50
+          type: array
+        title:
+          description: New product name.
+          maxLength: 200
+          minLength: 1
+          type: string
+        vendor:
+          description: New vendor. Send null to clear it.
+          maxLength: 100
+          type:
+            - string
+            - "null"
+      title: ProductUpdate
+      type: object
+    ReadinessResponse:
+      additionalProperties: false
+      description: Readiness. Returns 200 when the application can serve API traffic and 503 when it cannot. The body shape is identical for both, so a client parses one thing.
+      properties:
+        checked_at:
+          description: When these checks ran. Results are not cached.
+          format: date-time
+          type: string
+        checks:
+          additionalProperties: false
+          description: Per-dependency results, so a failure names itself.
+          properties:
+            configuration:
+              additionalProperties: false
+              properties:
+                detail:
+                  description: Human-readable explanation, useful when the check failed.
+                  type: string
+                duration_ms:
+                  description: How long this check took, in milliseconds.
+                  type: number
+                status:
+                  description: Whether this individual check passed.
+                  enum:
+                    - ok
+                    - fail
+                  type: string
+              required:
+                - status
+                - detail
+                - duration_ms
+              type: object
+            database:
+              additionalProperties: false
+              properties:
+                detail:
+                  description: Human-readable explanation, useful when the check failed.
+                  type: string
+                duration_ms:
+                  description: How long this check took, in milliseconds.
+                  type: number
+                status:
+                  description: Whether this individual check passed.
+                  enum:
+                    - ok
+                    - fail
+                  type: string
+              required:
+                - status
+                - detail
+                - duration_ms
+              type: object
+            migrations:
+              additionalProperties: false
+              properties:
+                detail:
+                  description: Human-readable explanation, useful when the check failed.
+                  type: string
+                duration_ms:
+                  description: How long this check took, in milliseconds.
+                  type: number
+                status:
+                  description: Whether this individual check passed.
+                  enum:
+                    - ok
+                    - fail
+                  type: string
+              required:
+                - status
+                - detail
+                - duration_ms
+              type: object
+          required:
+            - configuration
+            - database
+            - migrations
+          type: object
+        status:
+          description: Overall verdict. `not_ready` is returned with HTTP 503.
+          enum:
+            - ready
+            - not_ready
+          type: string
+      required:
+        - status
+        - checks
+        - checked_at
+      title: ReadinessResponse
+      type: object
+    ReservationRequest:
+      additionalProperties: false
+      description: Hold stock for a pending transaction.
+      example:
+        location_id: loc_...
+        quantity: 2
+        reference: cart_9931
+        sku: ACME-BAG-BLK
+        ttl_seconds: 900
+      properties:
+        location_id:
+          description: Which location to hold stock at.
+          pattern: ^loc_[0-9a-f]{24}$
+          type: string
+        quantity:
+          description: Units to hold. Must be positive.
+          maximum: 100000
+          minimum: 1
+          type: integer
+        reference:
+          description: Optional cart or order reference.
+          maxLength: 200
+          type: string
+        sku:
+          description: Stock-keeping unit.
+          example: ACME-BAG-BLK
+          maxLength: 64
+          minLength: 1
+          type: string
+        ttl_seconds:
+          default: 900
+          description: How long the hold lasts. Defaults to 15 minutes.
+          maximum: 86400
+          minimum: 60
+          type: integer
+      required:
+        - sku
+        - location_id
+        - quantity
+      title: ReservationRequest
+      type: object
+    ReservationResponse:
+      additionalProperties: false
+      description: A single reservation.
+      properties:
+        data:
+          $ref: "#/components/schemas/InventoryReservation"
+      required:
+        - data
+      title: ReservationResponse
+      type: object
+    SkuInventory:
+      additionalProperties: false
+      description: Availability for one SKU across every location.
+      properties:
+        locations:
+          description: Per-location breakdown. A location with no stock row for this SKU is absent, not zero.
+          items:
+            $ref: "#/components/schemas/InventoryLevel"
+          type: array
+        sku:
+          description: The SKU.
+          type: string
+        totals:
+          additionalProperties: false
+          description: Network-wide totals.
+          properties:
+            available:
+              description: Summed across every location.
+              type: integer
+            on_hand:
+              description: Summed across every location.
+              type: integer
+            reserved:
+              description: Summed across every location.
+              type: integer
+          required:
+            - on_hand
+            - reserved
+            - available
+          type: object
+        tracked:
+          description: Whether stock is tracked for this SKU.
+          type: boolean
+      required:
+        - sku
+        - tracked
+        - totals
+        - locations
+      title: SkuInventory
+      type: object
+    SkuInventoryResponse:
+      additionalProperties: false
+      description: Availability for one SKU.
+      properties:
+        data:
+          $ref: "#/components/schemas/SkuInventory"
+      required:
+        - data
+      title: SkuInventoryResponse
+      type: object
+    TokenRequest:
+      additionalProperties: false
+      description: Credentials exchanged for a bearer token.
+      example:
+        email: dev@acme.example
+        password: dev-password-123
+      properties:
+        email:
+          description: Email address of a development user. Case-insensitive.
+          maxLength: 320
+          minLength: 3
+          type: string
+        password:
+          description: The user's password. Seeded development users share one; see the README.
+          maxLength: 200
+          minLength: 1
+          type: string
+      required:
+        - email
+        - password
+      title: TokenRequest
+      type: object
+    TokenResponse:
+      additionalProperties: false
+      description: A newly issued development bearer token, with the identity it represents.
+      properties:
+        data:
+          additionalProperties: false
+          properties:
+            access_token:
+              description: "A JWT. Send it as `Authorization: Bearer <token>`. It is signed, not encrypted — anyone holding it can read every claim inside it, so treat it as a credential."
+              type: string
+            expires_at:
+              description: Absolute expiry, RFC 3339.
+              format: date-time
+              type: string
+            expires_in:
+              description: Lifetime in seconds from issue.
+              type: integer
+            principal:
+              $ref: "#/components/schemas/Identity"
+            token_type:
+              description: Always `Bearer`.
+              enum:
+                - Bearer
+              type: string
+          required:
+            - access_token
+            - token_type
+            - expires_in
+            - expires_at
+            - principal
+          type: object
+      required:
+        - data
+      title: TokenResponse
+      type: object
+    Variant:
+      additionalProperties: false
+      description: "A purchasable unit of a product: one SKU, one price. Inventory and orders reference variants, not products."
+      properties:
+        archived_at:
+          description: When the variant was archived. Non-null exactly when `status` is `archived`.
+          format: date-time
+          type:
+            - "null"
+            - string
+        barcode:
+          description: UPC, EAN, or ISBN. Null when unknown.
+          maxLength: 64
+          type:
+            - "null"
+            - string
+        compare_at_price_cents:
+          description: Reference "was" price in minor units, used to display a markdown. Null when the variant is not on sale. Not validated against `price_cents`.
+          minimum: 0
+          type:
+            - "null"
+            - integer
+        created_at:
+          description: RFC 3339 creation timestamp, UTC.
+          format: date-time
+          type: string
+        currency:
+          description: ISO 4217 currency code for `price_cents` and `compare_at_price_cents`.
+          example: CAD
+          pattern: ^[A-Z]{3}$
+          type: string
+        id:
+          description: Server-assigned variant identifier.
+          example: var_1a2b3c4d5e6f708192a3b4c5
+          pattern: ^var_[0-9a-f]{24}$
+          type: string
+        inventory_item_id:
+          description: Reference to the inventory item that tracks stock for this variant. Always null in Milestone 1 — the Inventory API that populates it arrives in Milestone 2. Present in the contract now so the seam is visible rather than pretended away.
+          maxLength: 64
+          type:
+            - "null"
+            - string
+        position:
+          description: Display order within the product. `GET /products/{id}/variants` returns variants sorted by this value, then by `id` to break ties.
+          minimum: 1
+          type: integer
+        price_cents:
+          description: "Price in the smallest unit of `currency` — 12900 means CAD 129.00. An integer, never a decimal: IEEE-754 floats cannot represent 0.10 exactly, and money arithmetic in floats produces off-by-a-cent errors that survive most test suites."
+          example: 12900
+          minimum: 0
+          type: integer
+        product_id:
+          description: Identifier of the product this variant belongs to.
+          pattern: ^prod_[0-9a-f]{24}$
+          type: string
+        sku:
+          description: Stock-keeping unit. Unique across the ENTIRE catalog, not merely within one product. Creating a variant with a SKU that already exists returns 409.
+          example: ACME-BAG-BLK
+          maxLength: 64
+          minLength: 1
+          type: string
+        status:
+          description: "Variant state. Variants have no `draft`: publication is a product-level concept, so a variant of a draft product is `active` and simply not reachable by customers."
+          enum:
+            - active
+            - archived
+          type: string
+        title:
+          description: Variant name, typically the option combination.
+          example: Black
+          maxLength: 200
+          minLength: 1
+          type: string
+        updated_at:
+          description: RFC 3339 last-modified timestamp, UTC.
+          format: date-time
+          type: string
+      required:
+        - id
+        - product_id
+        - sku
+        - title
+        - price_cents
+        - compare_at_price_cents
+        - currency
+        - barcode
+        - inventory_item_id
+        - status
+        - position
+        - created_at
+        - updated_at
+        - archived_at
+      title: Variant
+      type: object
+    VariantCreate:
+      additionalProperties: false
+      description: Body for creating a variant. The parent product is taken from the URL path, not the body, so the two cannot disagree.
+      example:
+        compare_at_price_cents: 22900
+        currency: CAD
+        price_cents: 18900
+        sku: ACME-RAIN-BLK-M
+        title: Black / Medium
+      properties:
+        barcode:
+          description: Optional UPC/EAN.
+          maxLength: 64
+          minLength: 1
+          type: string
+        compare_at_price_cents:
+          description: Optional reference price in minor units.
+          minimum: 0
+          type: integer
+        currency:
+          default: CAD
+          description: Optional ISO 4217 code. Defaults to CAD.
+          pattern: ^[A-Z]{3}$
+          type: string
+        position:
+          description: Optional display order. Defaults to one past the current highest position.
+          minimum: 1
+          type: integer
+        price_cents:
+          description: Required. Price in minor units. Must be a non-negative integer.
+          minimum: 0
+          type: integer
+        sku:
+          description: Required. Must be unique across the entire catalog.
+          maxLength: 64
+          minLength: 1
+          type: string
+        title:
+          description: Required. Variant name.
+          maxLength: 200
+          minLength: 1
+          type: string
+      required:
+        - sku
+        - title
+        - price_cents
+      title: VariantCreate
+      type: object
+    VariantListResponse:
+      additionalProperties: false
+      description: Every variant belonging to one product, unpaginated.
+      properties:
+        data:
+          description: "All variants of the product, ordered by `position` then `id`. This sub-collection is not paginated: a product has tens of variants, not thousands. The response is capped at 250."
+          items:
+            $ref: "#/components/schemas/Variant"
+          maxItems: 250
+          type: array
+      required:
+        - data
+      title: VariantListResponse
+      type: object
+    VariantResponse:
+      additionalProperties: false
+      description: A single variant.
+      properties:
+        data:
+          $ref: "#/components/schemas/Variant"
+      required:
+        - data
+      title: VariantResponse
+      type: object
+    VariantUpdate:
+      additionalProperties: false
+      description: Partial update of a variant. Same omitted-versus-null semantics as ProductUpdate.
+      example:
+        compare_at_price_cents: null
+        price_cents: 11900
+      minProperties: 1
+      properties:
+        barcode:
+          description: New barcode. Send null to clear it.
+          maxLength: 64
+          type:
+            - string
+            - "null"
+        compare_at_price_cents:
+          description: New reference price. Send null to remove the markdown.
+          minimum: 0
+          type:
+            - integer
+            - "null"
+        currency:
+          description: New ISO 4217 currency code.
+          pattern: ^[A-Z]{3}$
+          type: string
+        position:
+          description: New display order.
+          minimum: 1
+          type: integer
+        price_cents:
+          description: New price in minor units.
+          minimum: 0
+          type: integer
+        sku:
+          description: New SKU. Still subject to global uniqueness.
+          maxLength: 64
+          minLength: 1
+          type: string
+        status:
+          description: New variant state. `archived` is equivalent to DELETE.
+          enum:
+            - active
+            - archived
+          type: string
+        title:
+          description: New variant name.
+          maxLength: 200
+          minLength: 1
+          type: string
+      title: VariantUpdate
+      type: object
+  securitySchemes:
+    bearerAuth:
+      bearerFormat: JWT
+      description: |-
+        A development bearer token from `POST /api/v1/auth/token`.
+
+        Send it as `Authorization: Bearer <token>`.
+
+        The token is a JWT: signed, **not encrypted**. Anyone holding it can read every claim inside it, so treat it as a credential and keep it out of anything you commit. It cannot be revoked individually — it is valid until it expires.
+
+        Catalog **reads** are deliberately unauthenticated: a storefront browses the catalog without credentials. Everything that writes, and everything under locations, inventory, and pricing, requires a token.
+      scheme: bearer
+      type: http
+externalDocs:
+  description: Repository README, architecture notes, and the learning guide.
+  url: https://github.com/jbtwo/acme_commerce#readme
+info:
+  contact:
+    email: platform@acme.example
+    name: Acme Commerce Platform Team
+  description: |-
+    Acme Commerce is a fictional ecommerce platform whose APIs are the product. This document
+    describes the internal API used by first-party applications.
+
+    ## Conventions
+
+    **Envelopes.** A single resource is `{ "data": { ... } }`. A paginated collection is
+    `{ "data": [ ... ], "pagination": { ... } }`. Every error is
+    `{ "error": { "code", "message", "request_id", "details"? } }`. Wrapping leaves room to add
+    metadata later without breaking existing clients.
+
+    The platform endpoints `/health`, `/ready`, and `/openapi.json` sit outside that envelope
+    and outside the version prefix, deliberately: they describe the process, not the product, and
+    a container probe should not have to track API versions.
+
+    **Field naming.** `snake_case` in JSON, everywhere, in both directions.
+
+    **Money.** Integer minor units with a separate currency — `price_cents: 12900` with
+    `currency: "CAD"` means CAD 129.00. Never a float: IEEE-754 cannot represent 0.10 exactly,
+    and money arithmetic in floats produces off-by-a-cent errors that survive most test suites.
+
+    **Timestamps.** RFC 3339 in UTC, always with an explicit offset.
+
+    **Identifiers.** Prefixed and opaque: `prod_` or `var_` followed by 24 lowercase hex
+    characters. Assigned by the server; never constructed by a client. A syntactically invalid id
+    returns `400 MALFORMED_ID`, while a well-formed id naming nothing returns `404` — so a
+    broken string interpolation is distinguishable from a deleted record.
+
+    ## Correlation
+
+    Send `X-Request-Id` to correlate a request with your own systems, or omit it and the server
+    generates one. Either way the value comes back in the `X-Request-Id` **response header** on
+    every response, success or failure, and appears in `error.request_id`. It is on every server
+    log line for that request. When something goes wrong, that string is what makes the server-side
+    story findable.
+
+    ## Pagination
+
+    Offset-based: `page` (default 1) and `limit` (default 25, maximum 100). An out-of-range
+    `limit` is rejected with `400` rather than silently clamped. An empty result set is `200`
+    with `"data": []`, never `404`. `total_pages` is `0` when `total` is `0`.
+
+    Every sort appends `id` as a tiebreaker, so paging through a sorted list cannot show the same
+    record twice or skip one.
+
+    ## Strictness
+
+    Unknown properties in a request body, and unknown query parameters, are **rejected with 400**
+    rather than ignored. Most public APIs ignore them. This one does not, because
+    `?statuss=active` quietly returning every product is a worse outcome than a loud error that
+    names the unrecognised parameter.
+
+    ## Errors
+
+    Branch on `error.code`, never on `error.message` — the code is the contract and the message
+    is prose that may be reworded at any time. `error.details` carries structured context whose
+    shape depends on the code.
+
+    ## Authentication
+
+    Get a token from `POST /api/v1/auth/token` and send it as `Authorization: Bearer <token>`.
+
+    **Catalog reads are deliberately open.** A storefront browses products without credentials.
+    Everything that writes — and all of locations, inventory, and pricing — requires a token.
+
+    Three roles, and permissions are what routes actually check:
+
+    | Role | Holds |
+    |---|---|
+    | `developer` | every read and write except admin-only actions |
+    | `support` | **read-only** across every domain |
+    | `admin` | everything |
+
+    `401` means the server does not know who you are — send credentials. `403` means it knows
+    exactly who you are and the answer is still no; retrying with the same token will not help. A
+    `403` always names the permission it wanted, in `error.details.required_permission`.
+    `GET /api/v1/auth/me` reports the permissions you actually hold.
+
+    This is a **development** auth flow, not an identity provider. Tokens cannot be revoked
+    individually and seeded passwords are published in the README. Do not deploy this where it can
+    be reached from the internet. Partner API keys arrive in Milestone 4.
+  license:
+    identifier: MIT
+    name: MIT
+  summary: Internal ecommerce platform API for catalog, inventory, orders, and fulfillment.
+  title: Acme Commerce API
+  version: 0.3.0
+openapi: 3.1.0
+paths:
+  /api/v1/auth/me:
+    get:
+      description: |-
+        Returns the identity behind the presented token, including the full permission set
+        and when the token expires.
+
+        The most useful endpoint in the API while you are debugging a `403`: it answers
+        "who does the server think I am, and what am I allowed to do" without guessing.
+
+        Permissions are resolved from the user's **current** role, not from the `role` claim
+        in the token. Change someone's role and it takes effect on their next request rather
+        than when their token expires.
+      operationId: getCurrentIdentity
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IdentityResponse"
+          description: The authenticated identity.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request is malformed (`VALIDATION_ERROR` or `INVALID_JSON`).
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Missing, malformed, invalid, or expired token.
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: An unexpected server error. `error.request_id` identifies it in the logs.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The database is unreachable. Safe to retry.
+      security:
+        - bearerAuth: []
+      summary: Describe the authenticated caller
+      tags:
+        - Authentication
+  /api/v1/auth/token:
+    post:
+      description: |-
+        Issues a signed JWT for a known development user.
+
+        **This is a development authentication flow, not an identity provider.** There is no
+        registration, password reset, email verification, refresh token, or session. It exists
+        so that bearer tokens, roles, permissions, and expiry have something real to attach to.
+        Do not model a production auth system on it.
+
+        **The token is signed, not encrypted.** Decode the middle segment and you can read every
+        claim — that is normal and expected. The signature makes the claims tamper-evident, not
+        secret. Nothing sensitive is put inside it.
+
+        **Tokens cannot be revoked.** A stateless token is valid until it expires; the only
+        global lever is rotating the signing secret. That is why the lifetime is short. A
+        deactivated user *is* rejected immediately, because the account is re-read on every
+        request rather than trusted from the token.
+
+        Unknown email, wrong password, and deactivated account all return the identical
+        `401 INVALID_CREDENTIALS`, in comparable time. Distinguishing them would let this
+        endpoint be used to discover which accounts exist.
+
+        Rate limited per client IP — it is unauthenticated and runs a deliberately expensive
+        password hash on every call.
+      operationId: createToken
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TokenRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+          description: A newly issued bearer token.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request is malformed (`VALIDATION_ERROR` or `INVALID_JSON`).
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Email or password is incorrect (`INVALID_CREDENTIALS`).
+        "429":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Too many attempts from this client. See the `Retry-After` header (`RATE_LIMITED`).
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: An unexpected server error. `error.request_id` identifies it in the logs.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The database is unreachable. Safe to retry.
+      summary: Exchange credentials for a bearer token
+      tags:
+        - Authentication
+  /api/v1/inventory:
+    get:
+      description: |-
+        Paginated stock levels across SKUs and locations.
+
+        `available` is `on_hand - reserved`, **computed at read time**. There is no stored
+        availability column, because a third stored number is the first thing to disagree
+        with the other two.
+
+        `?available_below=5` is the low-stock query — it filters on the computed value, not
+        on `on_hand`, so stock that is physically present but entirely reserved correctly
+        counts as unavailable.
+      operationId: listInventory
+      parameters:
+        - description: One-based page number.
+          in: query
+          name: page
+          required: false
+          schema:
+            default: 1
+            minimum: 1
+            type: integer
+        - description: Records per page, max 100.
+          in: query
+          name: limit
+          required: false
+          schema:
+            default: 25
+            maximum: 100
+            minimum: 1
+            type: integer
+        - description: Exact SKU match.
+          in: query
+          name: sku
+          required: false
+          schema:
+            maxLength: 64
+            minLength: 1
+            type: string
+        - description: Restrict to one location.
+          in: query
+          name: location_id
+          required: false
+          schema:
+            type: string
+        - description: Only levels whose computed availability is strictly below this. The low-stock query a merchandiser actually wants.
+          example: 5
+          in: query
+          name: available_below
+          required: false
+          schema:
+            minimum: 0
+            type: integer
+        - description: Sort field. Allowlisted; `id` breaks ties.
+          in: query
+          name: sort
+          required: false
+          schema:
+            default: sku
+            enum:
+              - sku
+              - available
+              - on_hand
+              - updated_at
+            type: string
+        - description: Sort direction.
+          in: query
+          name: order
+          required: false
+          schema:
+            default: asc
+            enum:
+              - asc
+              - desc
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryListResponse"
+          description: A page of stock levels.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request is malformed (`VALIDATION_ERROR` or `MALFORMED_ID`).
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Missing, malformed, invalid, or expired bearer token.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Authenticated, but your role lacks the required permission.
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: An unexpected server error.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The database is unreachable. Safe to retry.
+      security:
+        - bearerAuth: []
+      summary: List stock levels
+      tags:
+        - Inventory
+  /api/v1/inventory/adjustments:
+    post:
+      description: |-
+        Applies a signed change to one SKU at one location and records it in the audit log.
+
+        `actor` is taken from your bearer token, never from the request body. An audit log a
+        caller can sign someone else's name to is not an audit log.
+
+        Refuses to drive `on_hand` below zero, and refuses to drive it below the quantity
+        already `reserved` — both return `409 INVENTORY_INSUFFICIENT` with the current numbers
+        so you can see why.
+
+        Creates the level row automatically if this is the first stock at that location.
+      operationId: createInventoryAdjustment
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdjustmentRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdjustmentResponse"
+          description: The adjustment, and the resulting level.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request is malformed (`VALIDATION_ERROR` or `MALFORMED_ID`).
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Missing, malformed, invalid, or expired bearer token.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Authenticated, but your role lacks the required permission.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Either no such SKU exists in the catalog (`VARIANT_NOT_FOUND`) or it exists but is not inventory-tracked (`INVENTORY_ITEM_NOT_FOUND`). Deliberately distinct — they need different fixes. Or no such location (`LOCATION_NOT_FOUND`).
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The change would leave negative or over-reserved stock (`INVENTORY_INSUFFICIENT`).
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: An unexpected server error.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The database is unreachable. Safe to retry.
+      security:
+        - bearerAuth: []
+      summary: Increase, decrease, or correct stock
+      tags:
+        - Inventory
+  /api/v1/inventory/history:
+    get:
+      description: |-
+        Every adjustment ever made, newest first, filterable by SKU, location, reason, and
+        date range.
+
+        The log is **append-only**: entries are never updated and never deleted. That is what
+        makes it an audit log rather than a cache of current belief — the sum of the deltas
+        for a SKU and location reconciles with its `on_hand`.
+
+        Note that seeded fixture stock has no history. Fabricating adjustments for data that
+        was never adjusted would make the log a worse record.
+      operationId: listInventoryHistory
+      parameters:
+        - description: One-based page number.
+          in: query
+          name: page
+          required: false
+          schema:
+            default: 1
+            minimum: 1
+            type: integer
+        - description: Records per page, max 100.
+          in: query
+          name: limit
+          required: false
+          schema:
+            default: 25
+            maximum: 100
+            minimum: 1
+            type: integer
+        - description: Exact SKU match.
+          in: query
+          name: sku
+          required: false
+          schema:
+            maxLength: 64
+            minLength: 1
+            type: string
+        - description: Restrict to one location.
+          in: query
+          name: location_id
+          required: false
+          schema:
+            type: string
+        - description: Restrict to one reason.
+          in: query
+          name: reason
+          required: false
+          schema:
+            enum:
+              - received
+              - sold
+              - damaged
+              - correction
+              - transfer_in
+              - transfer_out
+              - return
+            type: string
+        - description: Inclusive lower bound, RFC 3339.
+          in: query
+          name: created_after
+          required: false
+          schema:
+            format: date-time
+            type: string
+        - description: Inclusive upper bound, RFC 3339.
+          in: query
+          name: created_before
+          required: false
+          schema:
+            format: date-time
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HistoryResponse"
+          description: A page of adjustments.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request is malformed (`VALIDATION_ERROR` or `MALFORMED_ID`).
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Missing, malformed, invalid, or expired bearer token.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Authenticated, but your role lacks the required permission.
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: An unexpected server error.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The database is unreachable. Safe to retry.
+      security:
+        - bearerAuth: []
+      summary: Retrieve the stock audit log
+      tags:
+        - Inventory
+  /api/v1/inventory/reservations:
+    post:
+      description: |-
+        Holds stock so it cannot be sold twice while a transaction is in flight.
+
+        **Two callers cannot both reserve the last unit.** The hold is applied by attempting
+        the update and letting a database constraint arbitrate, not by reading availability
+        and then writing. A read-check-write has a race window that only appears under
+        concurrency — which is to say, only in production. Losing that race returns
+        `409 INVENTORY_INSUFFICIENT` with the authoritative available quantity.
+
+        Reservations expire (15 minutes by default). Expired holds are swept back inside the
+        next reservation attempt for the same SKU and location, so lapsed stock frees itself
+        on next use rather than needing a scheduler.
+      operationId: createInventoryReservation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReservationRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReservationResponse"
+          description: The reservation that was created.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request is malformed (`VALIDATION_ERROR` or `MALFORMED_ID`).
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Missing, malformed, invalid, or expired bearer token.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Authenticated, but your role lacks the required permission.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Either no such SKU exists in the catalog (`VARIANT_NOT_FOUND`) or it exists but is not inventory-tracked (`INVENTORY_ITEM_NOT_FOUND`). Deliberately distinct — they need different fixes. Or no such location (`LOCATION_NOT_FOUND`).
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Not enough available stock (`INVENTORY_INSUFFICIENT`). `error.details.available` is authoritative.
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: An unexpected server error.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The database is unreachable. Safe to retry.
+      security:
+        - bearerAuth: []
+      summary: Reserve stock for a pending transaction
+      tags:
+        - Inventory
+  /api/v1/inventory/reservations/{reservationId}:
+    get:
+      description: Returns one reservation. A hold whose `expires_at` has passed is reported as `expired` immediately, even if the sweep that returns its stock has not run yet — reporting it as still active would be the worse lie.
+      operationId: getInventoryReservation
+      parameters:
+        - description: Reservation identifier as returned by the API.
+          in: path
+          name: reservationId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReservationResponse"
+          description: The requested reservation.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request is malformed (`VALIDATION_ERROR` or `MALFORMED_ID`).
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Missing, malformed, invalid, or expired bearer token.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Authenticated, but your role lacks the required permission.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: No such reservation (`RESERVATION_NOT_FOUND`).
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: An unexpected server error.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The database is unreachable. Safe to retry.
+      security:
+        - bearerAuth: []
+      summary: Retrieve a reservation
+      tags:
+        - Inventory
+  /api/v1/inventory/reservations/{reservationId}/release:
+    post:
+      description: |-
+        Returns held stock to available and marks the reservation `released`.
+
+        **Idempotent.** Releasing an already-released reservation returns `200` with it
+        unchanged, for the same reason archiving a product twice does: "make sure this is
+        released" is a reasonable thing to say twice, especially after a network timeout.
+
+        Releasing an **expired** reservation is different and returns `409` — its stock was
+        already reclaimed, so succeeding silently would let you believe you had returned
+        stock you had not.
+      operationId: releaseInventoryReservation
+      parameters:
+        - description: Reservation identifier as returned by the API.
+          in: path
+          name: reservationId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReservationResponse"
+          description: The released reservation. Returned for a repeat call too.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request is malformed (`VALIDATION_ERROR` or `MALFORMED_ID`).
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Missing, malformed, invalid, or expired bearer token.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Authenticated, but your role lacks the required permission.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: No such reservation (`RESERVATION_NOT_FOUND`).
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The reservation had already expired (`RESERVATION_NOT_ACTIVE`).
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: An unexpected server error.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The database is unreachable. Safe to retry.
+      security:
+        - bearerAuth: []
+      summary: Release a reservation
+      tags:
+        - Inventory
+  /api/v1/inventory/{sku}:
+    get:
+      description: |-
+        Stock for a single SKU across every location, with network-wide totals.
+
+        **The path parameter is a SKU, not an opaque id** — the one place in this API where a
+        human-meaningful natural key sits in a path, because that is how people refer to
+        inventory. The tradeoff: renaming a SKU changes the URL, which an opaque id would
+        have insulated you from.
+
+        A location with no stock row for this SKU is absent from `locations` rather than
+        reported as zero. Never stocked there and stocked-but-empty are different facts.
+      operationId: getInventoryForSku
+      parameters:
+        - description: Stock-keeping unit. Note this is a natural key, not an opaque id.
+          in: path
+          name: sku
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkuInventoryResponse"
+          description: Availability across locations.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request is malformed (`VALIDATION_ERROR` or `MALFORMED_ID`).
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Missing, malformed, invalid, or expired bearer token.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Authenticated, but your role lacks the required permission.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Either no such SKU exists in the catalog (`VARIANT_NOT_FOUND`) or it exists but is not inventory-tracked (`INVENTORY_ITEM_NOT_FOUND`). Deliberately distinct — they need different fixes.
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: An unexpected server error.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The database is unreachable. Safe to retry.
+      security:
+        - bearerAuth: []
+      summary: Retrieve availability for one SKU
+      tags:
+        - Inventory
+  /api/v1/locations:
+    get:
+      description: |-
+        Paginated, filterable list of the places inventory is held.
+
+        With no `is_active` filter, both active and retired locations are returned — the same
+        no-hidden-filter rule as the catalog. The result set is fully determined by the query
+        string.
+
+        Requires the `locations:read` permission, which every role has.
+      operationId: listLocations
+      parameters:
+        - description: One-based page number.
+          in: query
+          name: page
+          required: false
+          schema:
+            default: 1
+            minimum: 1
+            type: integer
+        - description: Records per page, max 100.
+          in: query
+          name: limit
+          required: false
+          schema:
+            default: 25
+            maximum: 100
+            minimum: 1
+            type: integer
+        - description: Kind of location. `warehouse` fulfils orders, `retail` is a physical store, `virtual` covers dropship and in-transit stock that has no address.
+          in: query
+          name: type
+          required: false
+          schema:
+            enum:
+              - warehouse
+              - retail
+              - virtual
+            type: string
+        - description: Filter by active state. Omit to return locations of both states.
+          in: query
+          name: is_active
+          required: false
+          schema:
+            type: boolean
+        - description: Case-insensitive substring match on name and city.
+          in: query
+          name: q
+          required: false
+          schema:
+            maxLength: 100
+            minLength: 1
+            type: string
+        - description: Sort field. Allowlisted; `id` is appended as a stable tiebreaker.
+          in: query
+          name: sort
+          required: false
+          schema:
+            default: name
+            enum:
+              - name
+              - type
+              - created_at
+              - updated_at
+            type: string
+        - description: Sort direction.
+          in: query
+          name: order
+          required: false
+          schema:
+            default: asc
+            enum:
+              - asc
+              - desc
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LocationListResponse"
+          description: A page of locations.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request is malformed (`VALIDATION_ERROR`, `MALFORMED_ID`, or `INVALID_JSON`).
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Missing, malformed, invalid, or expired bearer token.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Authenticated, but your role lacks the required permission (`INSUFFICIENT_PERMISSION`).
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: An unexpected server error.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The database is unreachable. Safe to retry.
+      security:
+        - bearerAuth: []
+      summary: List inventory locations
+      tags:
+        - Locations
+    post:
+      description: |-
+        Creates a location. Names are unique case-insensitively; a duplicate returns `409`.
+
+        Requires `locations:write`. The `support` role does not have it — logging in as
+        support and calling this is the shortest way to see a `403` that names the permission
+        it wanted.
+      operationId: createLocation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LocationCreate"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LocationResponse"
+          description: The location that was created.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request is malformed (`VALIDATION_ERROR`, `MALFORMED_ID`, or `INVALID_JSON`).
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Missing, malformed, invalid, or expired bearer token.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Authenticated, but your role lacks the required permission (`INSUFFICIENT_PERMISSION`).
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: A location with that name already exists (`LOCATION_NAME_EXISTS`).
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: An unexpected server error.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The database is unreachable. Safe to retry.
+      security:
+        - bearerAuth: []
+      summary: Create an inventory location
+      tags:
+        - Locations
+  /api/v1/locations/{locationId}:
+    get:
+      description: Returns one location. A syntactically invalid id returns `400 MALFORMED_ID`; a well-formed id naming nothing returns `404`.
+      operationId: getLocation
+      parameters:
+        - description: Location identifier as returned by the API.
+          in: path
+          name: locationId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LocationResponse"
+          description: The requested location.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request is malformed (`VALIDATION_ERROR`, `MALFORMED_ID`, or `INVALID_JSON`).
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Missing, malformed, invalid, or expired bearer token.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Authenticated, but your role lacks the required permission (`INSUFFICIENT_PERMISSION`).
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: No location exists with that identifier (`LOCATION_NOT_FOUND`).
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: An unexpected server error.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The database is unreachable. Safe to retry.
+      security:
+        - bearerAuth: []
+      summary: Retrieve a location
+      tags:
+        - Locations
+    patch:
+      description: |-
+        Updates only the properties present in the body. Omitted properties are unchanged; an
+        explicit `null` clears a nullable one.
+
+        **There is no DELETE.** A location is referenced by inventory levels and by the
+        adjustment audit log, so removing one would orphan history that has to stay
+        answerable. Retire a location with `{"is_active": false}` instead — which is what
+        "delete this warehouse" actually means in a business that has shipped from it.
+      operationId: updateLocation
+      parameters:
+        - description: Location identifier as returned by the API.
+          in: path
+          name: locationId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LocationUpdate"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LocationResponse"
+          description: The location after the update.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request is malformed (`VALIDATION_ERROR`, `MALFORMED_ID`, or `INVALID_JSON`).
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Missing, malformed, invalid, or expired bearer token.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Authenticated, but your role lacks the required permission (`INSUFFICIENT_PERMISSION`).
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: No location exists with that identifier (`LOCATION_NOT_FOUND`).
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Another location already uses that name (`LOCATION_NAME_EXISTS`).
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: An unexpected server error.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The database is unreachable. Safe to retry.
+      security:
+        - bearerAuth: []
+      summary: Partially update a location
+      tags:
+        - Locations
+  /api/v1/pricing/{sku}:
+    get:
+      description: |-
+        Returns the price **and the derivation**, not just a number.
+
+        The response lists every rule considered, in the order applied, with the amount each
+        contributed — and the ones that did **not** apply, with the reason. That last part is
+        the difference between an API a support engineer can answer a question with and one
+        that produces a figure nobody can explain.
+
+        **Order and compounding.** Rules apply in ascending `priority`, each against the
+        running subtotal rather than the base price. Two 10% discounts therefore compound to
+        19%, not 20%. A business decision, stated rather than implied.
+
+        **Rounding.** Each step rounds to a whole minor unit, half away from zero. Each
+        reported `amount_cents` is defined as the difference between the subtotal before and
+        after, so the adjustments always sum exactly to `effective_unit_price_cents`.
+
+        Requires `pricing:read` because `?customer_id=` returns customer-specific pricing, and
+        commercial terms are not public.
+      operationId: getEffectivePrice
+      parameters:
+        - description: "Unlocks customer-group pricing. Until the Customer API arrives in Milestone 3 the group mapping is fixture data: `customer_wholesale_001`, `customer_edu_001`, `customer_retail_001`."
+          example: customer_wholesale_001
+          in: query
+          name: customer_id
+          required: false
+          schema:
+            maxLength: 64
+            type: string
+        - description: Unlocks partner-specific pricing. No partner rules are seeded yet.
+          in: query
+          name: partner_id
+          required: false
+          schema:
+            maxLength: 64
+            type: string
+        - description: Units. Drives quantity-break rules.
+          in: query
+          name: quantity
+          required: false
+          schema:
+            default: 1
+            maximum: 1000000
+            minimum: 1
+            type: integer
+        - description: Assert the currency you expect. Mismatching the price's own currency returns 404 rather than converting — a wrong exchange rate silently applied is worse than a refusal.
+          in: query
+          name: currency
+          required: false
+          schema:
+            pattern: ^[A-Z]{3}$
+            type: string
+        - description: Stock-keeping unit to price.
+          in: path
+          name: sku
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PriceQuoteResponse"
+          description: The effective price and its full derivation.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request is malformed (`VALIDATION_ERROR`).
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Missing, malformed, invalid, or expired bearer token.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Authenticated, but your role lacks `pricing:read`.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: No such SKU (`VARIANT_NOT_FOUND`), or no price in the currency you asked for (`PRICING_UNAVAILABLE`).
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: An unexpected server error.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The database is unreachable. Safe to retry.
+      security:
+        - bearerAuth: []
+      summary: Calculate the effective price for a SKU
+      tags:
+        - Pricing
+  /api/v1/products:
+    get:
+      description: |-
+        Returns a page of products with pagination metadata.
+
+        **No implicit filtering.** With no `status` parameter, products of every status are
+        returned, archived ones included. This API applies no hidden default filter: the result
+        set is fully determined by the query string. Most catalog APIs hide archived records;
+        this one does not, so that DELETE is observable as a state change rather than as a
+        disappearance.
+
+        Filters combine with AND. An empty result is `200` with `"data": []`, never `404` —
+        an empty collection is a successful answer to a well-formed question. A page past the
+        end is also `200` with an empty array.
+
+        **Unknown query parameters are rejected with 400**, not ignored. `?statuss=active`
+        silently returning every product is a worse outcome than a loud error.
+
+        Ordering always ends with `id` as a tiebreaker, so paging through a sorted list cannot
+        show the same record twice.
+
+        Every response carries an `X-Request-Id` header.
+      operationId: listProducts
+      parameters:
+        - description: One-based page number. Requesting a page past the end returns an empty `data` array with 200, not 404.
+          in: query
+          name: page
+          required: false
+          schema:
+            default: 1
+            minimum: 1
+            type: integer
+        - description: Records per page. Default 25, maximum 100. A larger value is rejected with 400 rather than silently clamped, so a client asking for 1000 learns that it cannot have 1000.
+          in: query
+          name: limit
+          required: false
+          schema:
+            default: 25
+            maximum: 100
+            minimum: 1
+            type: integer
+        - description: "Filter by publication state. NOTE: with no `status` filter, products of ALL statuses are returned, archived included. This API applies no hidden default filter — the result set is fully determined by the query string."
+          in: query
+          name: status
+          required: false
+          schema:
+            enum:
+              - draft
+              - active
+              - archived
+            type: string
+        - description: Filter by vendor. Case-insensitive EXACT match, not a prefix or substring.
+          example: Acme
+          in: query
+          name: vendor
+          required: false
+          schema:
+            maxLength: 100
+            minLength: 1
+            type: string
+        - description: Filter by product type. Case-insensitive exact match.
+          example: Backpacks
+          in: query
+          name: product_type
+          required: false
+          schema:
+            maxLength: 100
+            minLength: 1
+            type: string
+        - description: Filter to products carrying this tag. Case-sensitive exact match on an array element. One tag per request in this version.
+          example: bestseller
+          in: query
+          name: tag
+          required: false
+          schema:
+            maxLength: 50
+            minLength: 1
+            type: string
+        - description: Case-insensitive substring search across `title`, `description`, and `vendor`. Does not search variant SKUs. Combines with the filters using AND.
+          example: backpack
+          in: query
+          name: q
+          required: false
+          schema:
+            maxLength: 200
+            minLength: 1
+            type: string
+        - description: Field to sort by. Restricted to this allowlist; any other value returns 400 with the permitted values in `error.details.allowed`. `id` is always appended as a tiebreaker so paging is stable across requests.
+          in: query
+          name: sort
+          required: false
+          schema:
+            default: created_at
+            enum:
+              - created_at
+              - updated_at
+              - title
+              - vendor
+              - product_type
+              - status
+            type: string
+        - description: Sort direction. Applies to the tiebreaker too.
+          in: query
+          name: order
+          required: false
+          schema:
+            default: desc
+            enum:
+              - asc
+              - desc
+            type: string
+        - description: Optional caller-supplied correlation id, echoed back in the X-Request-Id response header and included in structured errors. When absent or not matching this pattern, the server generates one. Supplying your own lets you correlate a request across your system and ours.
+          example: my-app-checkout-attempt-42
+          in: header
+          name: x-request-id
+          required: false
+          schema:
+            pattern: ^[A-Za-z0-9_-]{1,128}$
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductListResponse"
+          description: A page of products.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON.
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: An unexpected server error. `error.request_id` identifies the failure in the server logs.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The database is unreachable. Safe to retry; see the Retry-After header.
+      summary: List products
+      tags:
+        - Catalog
+    post:
+      description: |-
+        Creates a product. The identifier, timestamps, and archive state are assigned by the
+        server and cannot be supplied.
+
+        A new product defaults to `draft` status so that creating one does not accidentally
+        publish it.
+
+        Unknown body properties are rejected with `400` rather than ignored, so a misspelled
+        field is visible immediately instead of shipping to production believing it worked.
+
+        Responds `201` with a `Location` header pointing at the new product.
+      operationId: createProduct
+      parameters:
+        - description: Optional caller-supplied correlation id, echoed back in the X-Request-Id response header and included in structured errors. When absent or not matching this pattern, the server generates one. Supplying your own lets you correlate a request across your system and ours.
+          example: my-app-checkout-attempt-42
+          in: header
+          name: x-request-id
+          required: false
+          schema:
+            pattern: ^[A-Za-z0-9_-]{1,128}$
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductCreate"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductResponse"
+          description: The product that was created.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON.
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Missing, malformed, invalid, or expired bearer token.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Authenticated, but your role lacks `catalog:write` (`INSUFFICIENT_PERMISSION`).
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: An unexpected server error. `error.request_id` identifies the failure in the server logs.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The database is unreachable. Safe to retry; see the Retry-After header.
+      security:
+        - bearerAuth: []
+      summary: Create a product
+      tags:
+        - Catalog
+  /api/v1/products/{productId}:
+    delete:
+      description: |-
+        **Archives the product; it is not destroyed.** Status becomes `archived`,
+        `archived_at` is set, and all of its variants are archived with it.
+
+        Catalog records are referenced by historical orders. Hard-deleting a variant that a
+        two-year-old order points at destroys that order's meaning, so retiring a product
+        is a state change rather than a deletion. Archived products remain retrievable and
+        still appear in `GET /products` unless you filter them out.
+
+        Responds `200` with the archived product rather than `204 No Content`, so the state
+        transition is visible in the response you are already looking at.
+
+        **Idempotent.** Archiving an already-archived product returns `200` again, not a
+        conflict — repeating a delete after a network timeout is not an error.
+      operationId: archiveProduct
+      parameters:
+        - description: Product identifier as returned by the API.
+          example: prod_7ebf51270d4d3de9f7acad4c
+          in: path
+          name: productId
+          required: true
+          schema:
+            type: string
+        - description: Optional caller-supplied correlation id, echoed back in the X-Request-Id response header and included in structured errors. When absent or not matching this pattern, the server generates one. Supplying your own lets you correlate a request across your system and ours.
+          example: my-app-checkout-attempt-42
+          in: header
+          name: x-request-id
+          required: false
+          schema:
+            pattern: ^[A-Za-z0-9_-]{1,128}$
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductResponse"
+          description: The archived product. Returned for a repeat call too.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON.
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Missing, malformed, invalid, or expired bearer token.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Authenticated, but your role lacks `catalog:write` (`INSUFFICIENT_PERMISSION`).
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: No product exists with that identifier (`PRODUCT_NOT_FOUND`).
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: An unexpected server error. `error.request_id` identifies the failure in the server logs.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The database is unreachable. Safe to retry; see the Retry-After header.
+      security:
+        - bearerAuth: []
+      summary: Archive a product
+      tags:
+        - Catalog
+    get:
+      description: |-
+        Returns one product by identifier.
+
+        Two different failures are deliberately distinguished. A syntactically invalid id
+        such as `prod_undefined` returns `400 MALFORMED_ID`, because that is a client bug.
+        A well-formed id that names nothing returns `404 PRODUCT_NOT_FOUND`. Collapsing both
+        into 404 — as many APIs do — leaves the caller unable to tell a broken string
+        interpolation from a deleted record.
+      operationId: getProduct
+      parameters:
+        - description: Product identifier as returned by the API.
+          example: prod_7ebf51270d4d3de9f7acad4c
+          in: path
+          name: productId
+          required: true
+          schema:
+            type: string
+        - description: Optional caller-supplied correlation id, echoed back in the X-Request-Id response header and included in structured errors. When absent or not matching this pattern, the server generates one. Supplying your own lets you correlate a request across your system and ours.
+          example: my-app-checkout-attempt-42
+          in: header
+          name: x-request-id
+          required: false
+          schema:
+            pattern: ^[A-Za-z0-9_-]{1,128}$
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductResponse"
+          description: The requested product.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: No product exists with that identifier (`PRODUCT_NOT_FOUND`).
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: An unexpected server error. `error.request_id` identifies the failure in the server logs.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The database is unreachable. Safe to retry; see the Retry-After header.
+      summary: Retrieve a product
+      tags:
+        - Catalog
+    patch:
+      description: |-
+        Updates only the properties present in the body.
+
+        Omitting a property leaves it unchanged; sending an explicit `null` clears a
+        nullable property. Those are different operations, and being able to express both
+        is the reason this is PATCH rather than PUT.
+
+        `tags` is replaced wholesale, not merged — send the complete list you want.
+
+        An empty body returns `400`: it is far more often a client bug than a deliberate
+        no-op. Setting `status` to `archived` here is equivalent to calling DELETE, and
+        moving it away from `archived` un-archives the product and its variants.
+      operationId: updateProduct
+      parameters:
+        - description: Product identifier as returned by the API.
+          example: prod_7ebf51270d4d3de9f7acad4c
+          in: path
+          name: productId
+          required: true
+          schema:
+            type: string
+        - description: Optional caller-supplied correlation id, echoed back in the X-Request-Id response header and included in structured errors. When absent or not matching this pattern, the server generates one. Supplying your own lets you correlate a request across your system and ours.
+          example: my-app-checkout-attempt-42
+          in: header
+          name: x-request-id
+          required: false
+          schema:
+            pattern: ^[A-Za-z0-9_-]{1,128}$
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductUpdate"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductResponse"
+          description: The product after the update.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON.
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Missing, malformed, invalid, or expired bearer token.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Authenticated, but your role lacks `catalog:write` (`INSUFFICIENT_PERMISSION`).
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: No product exists with that identifier (`PRODUCT_NOT_FOUND`).
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: An unexpected server error. `error.request_id` identifies the failure in the server logs.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The database is unreachable. Safe to retry; see the Retry-After header.
+      security:
+        - bearerAuth: []
+      summary: Partially update a product
+      tags:
+        - Catalog
+  /api/v1/products/{productId}/variants:
+    get:
+      description: |-
+        Returns every variant of the product, ordered by `position` then `id`.
+
+        Deliberately **not paginated**: a product has tens of variants, not thousands, and
+        forcing a caller to page through a size run would be pointless ceremony. The
+        response is capped at 250 variants, which is documented rather than assumed.
+
+        Because it is not a paginated collection, the response has no `pagination` object —
+        the one place in this API where a collection differs in shape, and it is called out
+        here so that a governance review can confirm the reason rather than flag an
+        inconsistency.
+
+        An unknown product returns `404`, not an empty list: "this product has no variants"
+        and "this product does not exist" are different facts.
+      operationId: listProductVariants
+      parameters:
+        - description: Product identifier as returned by the API.
+          example: prod_7ebf51270d4d3de9f7acad4c
+          in: path
+          name: productId
+          required: true
+          schema:
+            type: string
+        - description: Optional caller-supplied correlation id, echoed back in the X-Request-Id response header and included in structured errors. When absent or not matching this pattern, the server generates one. Supplying your own lets you correlate a request across your system and ours.
+          example: my-app-checkout-attempt-42
+          in: header
+          name: x-request-id
+          required: false
+          schema:
+            pattern: ^[A-Za-z0-9_-]{1,128}$
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VariantListResponse"
+          description: Every variant of the product.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: No product exists with that identifier (`PRODUCT_NOT_FOUND`).
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: An unexpected server error. `error.request_id` identifies the failure in the server logs.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The database is unreachable. Safe to retry; see the Retry-After header.
+      summary: List a product's variants
+      tags:
+        - Catalog
+    post:
+      description: |-
+        Adds a variant to the product named in the path. The parent is taken from the URL,
+        not the body, so the two cannot disagree.
+
+        `sku` must be unique across the ENTIRE catalog, not merely within this product. A
+        duplicate returns `409 SKU_ALREADY_EXISTS` with the conflicting variant id in
+        `error.details`. Uniqueness is enforced by a database constraint rather than by a
+        lookup before insert, because two concurrent requests can both pass a lookup.
+
+        `position` defaults to one past the current highest.
+
+        Responds `201` with a `Location` header.
+      operationId: createVariant
+      parameters:
+        - description: Product identifier as returned by the API.
+          example: prod_7ebf51270d4d3de9f7acad4c
+          in: path
+          name: productId
+          required: true
+          schema:
+            type: string
+        - description: Optional caller-supplied correlation id, echoed back in the X-Request-Id response header and included in structured errors. When absent or not matching this pattern, the server generates one. Supplying your own lets you correlate a request across your system and ours.
+          example: my-app-checkout-attempt-42
+          in: header
+          name: x-request-id
+          required: false
+          schema:
+            pattern: ^[A-Za-z0-9_-]{1,128}$
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VariantCreate"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VariantResponse"
+          description: The variant that was created.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON.
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Missing, malformed, invalid, or expired bearer token.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Authenticated, but your role lacks `catalog:write` (`INSUFFICIENT_PERMISSION`).
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: No product exists with that identifier (`PRODUCT_NOT_FOUND`).
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: A variant with that SKU already exists (`SKU_ALREADY_EXISTS`).
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: An unexpected server error. `error.request_id` identifies the failure in the server logs.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The database is unreachable. Safe to retry; see the Retry-After header.
+      security:
+        - bearerAuth: []
+      summary: Create a variant
+      tags:
+        - Catalog
+  /api/v1/variants/{variantId}:
+    delete:
+      description: "Archives the variant; it is not destroyed. Same rationale and same idempotency as archiving a product: historical orders reference variants, so retiring one is a state change. Responds `200` with the archived variant, including on a repeat call."
+      operationId: archiveVariant
+      parameters:
+        - description: Variant identifier as returned by the API.
+          example: var_1a2b3c4d5e6f708192a3b4c5
+          in: path
+          name: variantId
+          required: true
+          schema:
+            type: string
+        - description: Optional caller-supplied correlation id, echoed back in the X-Request-Id response header and included in structured errors. When absent or not matching this pattern, the server generates one. Supplying your own lets you correlate a request across your system and ours.
+          example: my-app-checkout-attempt-42
+          in: header
+          name: x-request-id
+          required: false
+          schema:
+            pattern: ^[A-Za-z0-9_-]{1,128}$
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VariantResponse"
+          description: The archived variant. Returned for a repeat call too.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON.
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Missing, malformed, invalid, or expired bearer token.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Authenticated, but your role lacks `catalog:write` (`INSUFFICIENT_PERMISSION`).
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: No variant exists with that identifier (`VARIANT_NOT_FOUND`).
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: An unexpected server error. `error.request_id` identifies the failure in the server logs.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The database is unreachable. Safe to retry; see the Retry-After header.
+      security:
+        - bearerAuth: []
+      summary: Archive a variant
+      tags:
+        - Catalog
+    get:
+      description: Returns one variant by identifier. Variants are addressable directly, without going through their product, because inventory and orders reference variants rather than products.
+      operationId: getVariant
+      parameters:
+        - description: Variant identifier as returned by the API.
+          example: var_1a2b3c4d5e6f708192a3b4c5
+          in: path
+          name: variantId
+          required: true
+          schema:
+            type: string
+        - description: Optional caller-supplied correlation id, echoed back in the X-Request-Id response header and included in structured errors. When absent or not matching this pattern, the server generates one. Supplying your own lets you correlate a request across your system and ours.
+          example: my-app-checkout-attempt-42
+          in: header
+          name: x-request-id
+          required: false
+          schema:
+            pattern: ^[A-Za-z0-9_-]{1,128}$
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VariantResponse"
+          description: The requested variant.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON.
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: No variant exists with that identifier (`VARIANT_NOT_FOUND`).
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: An unexpected server error. `error.request_id` identifies the failure in the server logs.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The database is unreachable. Safe to retry; see the Retry-After header.
+      summary: Retrieve a variant
+      tags:
+        - Catalog
+    patch:
+      description: Updates only the properties present in the body, with the same omitted-versus-null semantics as updating a product. Changing `sku` is permitted and remains subject to global uniqueness, so it can return `409`.
+      operationId: updateVariant
+      parameters:
+        - description: Variant identifier as returned by the API.
+          example: var_1a2b3c4d5e6f708192a3b4c5
+          in: path
+          name: variantId
+          required: true
+          schema:
+            type: string
+        - description: Optional caller-supplied correlation id, echoed back in the X-Request-Id response header and included in structured errors. When absent or not matching this pattern, the server generates one. Supplying your own lets you correlate a request across your system and ours.
+          example: my-app-checkout-attempt-42
+          in: header
+          name: x-request-id
+          required: false
+          schema:
+            pattern: ^[A-Za-z0-9_-]{1,128}$
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VariantUpdate"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VariantResponse"
+          description: The variant after the update.
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The request is malformed. `error.code` is VALIDATION_ERROR, MALFORMED_ID, or INVALID_JSON.
+        "401":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Missing, malformed, invalid, or expired bearer token.
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Authenticated, but your role lacks `catalog:write` (`INSUFFICIENT_PERMISSION`).
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: No variant exists with that identifier (`VARIANT_NOT_FOUND`).
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: Another variant already uses that SKU (`SKU_ALREADY_EXISTS`).
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: An unexpected server error. `error.request_id` identifies the failure in the server logs.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+          description: The database is unreachable. Safe to retry; see the Retry-After header.
+      security:
+        - bearerAuth: []
+      summary: Partially update a variant
+      tags:
+        - Catalog
+  /health:
+    get:
+      description: |-
+        Reports that the process is running and able to answer HTTP. **It does not contact
+        PostgreSQL**, and it does not fail when the database is down.
+
+        That is the whole distinction between liveness and readiness, and getting it wrong
+        is a classic outage amplifier: if a liveness probe fails during a database blip, the
+        orchestrator restarts every application container, and now you have a database
+        outage plus a thundering herd of cold starts. Liveness answers "should this process
+        be killed and replaced?" — a database outage is not a reason to kill this process.
+
+        Use this for a Docker HEALTHCHECK. Use `/ready` to decide whether to send traffic.
+      operationId: getHealth
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+          description: The process is alive.
+      summary: Liveness probe
+      tags:
+        - Platform
+  /openapi.json:
+    get:
+      description: |-
+        Returns the OpenAPI 3.1 document describing this API.
+
+        It is generated from the same JSON Schema objects that validate incoming requests and
+        serialize outgoing responses, so it cannot describe a request shape the server would
+        reject or a response field the server would strip.
+
+        What that guarantee does NOT cover: whether a `description` is accurate, whether an
+        `example` is current, or whether an operation is missing entirely. Those need review
+        and linting, not generation.
+
+        Import this URL into Postman to generate a collection skeleton.
+      operationId: getOpenApiDocument
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                type: object
+          description: The OpenAPI 3.1 document.
+      summary: Machine-readable API contract
+      tags:
+        - Platform
+  /ready:
+    get:
+      description: |-
+        Reports whether the application can serve API traffic right now. Three checks:
+
+        1. **configuration** — required settings were present and valid at startup. This one
+           cannot realistically fail here, because invalid configuration prevents the process
+           from starting at all. It is reported so the probe output is a complete picture.
+        2. **database** — a live round trip to PostgreSQL. Catches a wrong host, a wrong
+           password, a firewall, and a stopped database container.
+        3. **migrations** — whether every migration on disk has been applied. A container
+           running new code against an old schema is a specific, common, and confusing
+           failure; it is worth its own check.
+
+        Returns `200` when all three pass and `503` when any fails, with the same body shape
+        either way. Each check reports its own duration, so "the database is slow" and "the
+        database is unreachable" look different.
+
+        Outside production the body also names the database being checked, with the password
+        removed — that is usually the fastest way to discover a container is pointed at the
+        wrong host.
+      operationId: getReadiness
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+          description: Every check passed; the application can serve traffic.
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+          description: At least one check failed. Inspect `checks` to see which.
+      summary: Readiness probe
+      tags:
+        - Platform
+servers:
+  - description: The server this document was fetched from.
+    url: /
+tags:
+  - description: Liveness, readiness, and the machine-readable contract. Outside the version prefix and outside the response envelope, on purpose.
+    name: Platform
+  - description: Development credential exchange. Not an identity provider — see the operation descriptions for what that means and what it does not give you.
+    name: Authentication
+  - description: "Places inventory is held: warehouses, retail stores, and virtual locations for dropship or in-transit stock."
+    name: Locations
+  - description: Stock levels, adjustments, and reservations. `available` is always computed as `on_hand - reserved` rather than stored, and stock movements are arbitrated by database constraints so two callers cannot both take the last unit.
+    name: Inventory
+  - description: Effective price calculation. Responses explain the derivation — every rule considered, applied or skipped, and why.
+    name: Pricing
+  - description: Products and their variants. A product carries merchandising information; a variant is a purchasable unit with a SKU and a price. Inventory and orders reference variants, not products.
+    name: Catalog

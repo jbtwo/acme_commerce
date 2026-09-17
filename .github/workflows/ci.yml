@@ -1,0 +1,204 @@
+# The merge gate. Everything here needs a real PostgreSQL, which is why it is separate from
+# release.yml — that workflow deliberately proves only what can be proved without a database.
+#
+#   integration  147 Vitest tests against real PostgreSQL
+#   contract     the hand-built Postman collection, run by the Postman CLI against a live app
+#
+# The second job is the interesting one. The integration tests are written by the people who
+# wrote the code, against the code. The collection is the consumer's view: it exercises the
+# API the way a client integrator would, with chained variables and a token it fetches itself.
+# A change can pass every integration test and still break the collection — a renamed response
+# field, a changed status code, a tightened validation rule. That gap is what this job closes.
+#
+# The distinction worth being able to say out loud: Newman runs the collection. The Postman CLI
+# runs it and puts the result somewhere your platform team can see.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '26'
+  # Two databases on one server. The application uses acme_commerce; the integration suite uses
+  # acme_commerce_test, whose name satisfies src/db/guard.ts — the destructive tooling refuses
+  # to run against a database that is not named like a test database, and CI is not exempt.
+  DATABASE_URL: postgres://acme:acme@127.0.0.1:5432/acme_commerce
+  TEST_DATABASE_URL: postgres://acme:acme@127.0.0.1:5432/acme_commerce_test
+
+jobs:
+  integration:
+    name: Integration tests (real PostgreSQL)
+    runs-on: ubuntu-latest
+
+    # A service container, not Docker Compose. Actions manages the lifecycle, and the health
+    # check means the first step does not race the database's startup.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: acme
+          POSTGRES_PASSWORD: acme
+          POSTGRES_DB: acme_commerce
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U acme"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+
+      # POSTGRES_DB creates acme_commerce only. The test database has to be made explicitly.
+      - name: Create the test database
+        env:
+          PGPASSWORD: acme
+        run: psql -h 127.0.0.1 -U acme -d acme_commerce -c 'CREATE DATABASE acme_commerce_test'
+
+      - name: Migrate both databases
+        run: |
+          npm run migrate:up
+          DATABASE_URL="$TEST_DATABASE_URL" npm run migrate:up
+
+      - name: Integration tests
+        run: npm run test:integration
+
+  contract:
+    name: Contract tests (Postman CLI)
+    runs-on: ubuntu-latest
+    needs: integration
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: acme
+          POSTGRES_PASSWORD: acme
+          POSTGRES_DB: acme_commerce
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U acme"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # The collection's `development` environment points base_url at http://127.0.0.1:3000,
+      # which is exactly where the app runs here, so the environment needs no CI-specific edit.
+      PORT: '3000'
+      HOST: '127.0.0.1'
+      APP_ENV: development
+      # Signs tokens for this run only. Not a secret: the process it protects is destroyed
+      # with the runner, and nothing outside this job ever sees a token it issued.
+      AUTH_TOKEN_SECRET: ci-contract-run-signing-key-ephemeral
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+
+      # Runs the compiled output rather than tsx, so this exercises the same code path the
+      # container ships. A build error here is a release blocker, not a test failure.
+      - name: Build
+        run: npm run build
+
+      - name: Migrate and seed
+        run: |
+          npm run migrate:up
+          npm run db:seed
+
+      # Seeded IDs are a SHA-256 of a natural key truncated to 24 hex, so they are identical in
+      # every environment. That is what lets the collection hard-code seed_product_id and have
+      # it resolve here. Asserted rather than assumed — if the seed ever changes shape, the
+      # failure should name that, not surface as a confusing 404 inside the collection run.
+      - name: Start the app and confirm the seeded fixture exists
+        run: |
+          set -euo pipefail
+          npm start > "${RUNNER_TEMP}/app.log" 2>&1 &
+          echo $! > "${RUNNER_TEMP}/app.pid"
+
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3000/ready -o "${RUNNER_TEMP}/ready.json"; then break; fi
+            if ! kill -0 "$(cat "${RUNNER_TEMP}/app.pid")" 2>/dev/null; then
+              echo "::error::The app exited before becoming ready."
+              cat "${RUNNER_TEMP}/app.log"
+              exit 1
+            fi
+            sleep 1
+          done
+
+          if [ ! -f "${RUNNER_TEMP}/ready.json" ]; then
+            echo "::error::/ready never returned 200."
+            cat "${RUNNER_TEMP}/app.log"
+            exit 1
+          fi
+          cat "${RUNNER_TEMP}/ready.json"; echo
+
+          curl -fsS http://127.0.0.1:3000/api/v1/products/prod_7ebf51270d4d3de9f7acad4c \
+            -H "Authorization: Bearer $(curl -fsS http://127.0.0.1:3000/api/v1/auth/token \
+              -H 'Content-Type: application/json' \
+              -d '{"email":"dev@acme.example","password":"dev-password-123"}' \
+              | jq -r .data.access_token)" > /dev/null
+          echo "Seeded product prod_7ebf51270d4d3de9f7acad4c is present."
+
+      - name: Install the Postman CLI
+        run: curl -o- "https://dl-cli.pstmn.io/install/linux64.sh" | sh
+
+      # WHY --postman-api-key AND NOT `postman login`
+      #   The CLI's stored login lives in ~/.postman/postmanrc and belongs to whichever account
+      #   ran it. A runner has no login, and these resources are owned by one specific account
+      #   — a key from any other account gets a 403 on the collection ID, which is a confusing
+      #   way to learn that Postman resource IDs are account-scoped. The key is the only
+      #   supply-a-machine-identity-explicitly option, which is what CI should always want.
+      #
+      # WHY --env-var FOR THE PASSWORD
+      #   The collection's pre-request script reads the password from the Local Vault via
+      #   pm.vault.get(). Per Postman's docs the Postman CLI does not support the pm.vault
+      #   methods at all, and the Local Vault is unavailable to it even via {{vault:...}} —
+      #   only the Shared Vault is. So a vault lookup that works on a laptop is a hard failure
+      #   in a pipeline, and the credential has to be injected from the pipeline's own secret
+      #   store instead. --env-var is that injection point.
+      #
+      #   dev-password-123 is a published seed fixture, not a secret: it is committed in
+      #   src/db/seed and in the collection. A real credential belongs in
+      #   ${{ secrets.* }} and must never be put in a Postman environment export, which stores
+      #   values in plaintext.
+      - name: Run the collection
+        env:
+          POSTMAN_API_KEY: ${{ secrets.POSTMAN_API_KEY }}
+        run: |
+          if [ -z "${POSTMAN_API_KEY}" ]; then
+            echo "::error::POSTMAN_API_KEY is not set. Add it as a repository secret, using a"
+            echo "key generated by the Postman account that owns the collection." >&2
+            exit 1
+          fi
+          postman collection run 57347314-90cacb2a-c96b-46ed-b9a9-39a2883c5b2d \
+            --environment 57347314-6382720d-9f4c-4c4e-912a-139d91658fcd \
+            --env-var 'acme_dev_password=dev-password-123' \
+            --postman-api-key "${POSTMAN_API_KEY}" \
+            --color on
+
+      # `if: always()` so a failing collection run still surfaces the server side of the story.
+      # An assertion that failed on a 500 is only diagnosable with the log that produced it.
+      - name: Application log
+        if: always()
+        run: cat "${RUNNER_TEMP}/app.log" || true
+
+      - name: Stop the app
+        if: always()
+        run: kill "$(cat "${RUNNER_TEMP}/app.pid")" 2>/dev/null || true
