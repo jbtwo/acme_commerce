@@ -37,6 +37,16 @@ jobs:
     name: Integration tests (real PostgreSQL)
     runs-on: ubuntu-latest
 
+    env:
+      # The migration CLI calls loadConfig(), which validates the WHOLE configuration —
+      # including the token signing key it has no use for. So `migrate:up` refuses to run
+      # without AUTH_TOKEN_SECRET even though it never signs anything. Set here rather than
+      # loosened in the loader: a signing key with a default value would mean every deployment
+      # could forge tokens for every other, and that rule is worth more than this friction.
+      #
+      # Ephemeral and scoped to this job. It signs nothing that outlives the runner.
+      AUTH_TOKEN_SECRET: ci-integration-run-signing-key-ephemeral
+
     # A service container, not Docker Compose. Actions manages the lifecycle, and the health
     # check means the first step does not race the database's startup.
     services:
