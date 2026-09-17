@@ -37,7 +37,22 @@ scripts:
 
       // Refresh a minute early — a token that expires mid-run is worse than one fetched twice.
       if (!token || Date.now() > expiresAt - 60_000) {
-        const password = await pm.vault.get('acme-dev-password');
+
+      let password;
+      try {
+        password = await pm.vault?.get('acme-dev-password');
+      } catch {
+        password = undefined;   // Local Vault is unavailable — Postman CLI, monitor, scheduled run
+      }
+      password ||= pm.environment.get('acme_dev_password');
+
+      if (!password) {
+        throw new Error(
+          'No password available. Set the acme-dev-password vault secret locally, ' +
+          'or inject acme_dev_password with --env-var.'
+        );
+      }
+        
 
         pm.sendRequest({
           url: `${pm.environment.get('base_url')}/api/v1/auth/token`,
