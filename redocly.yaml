@@ -9,6 +9,10 @@ extends:
   - recommended
 
 rules:
+  # Validates every `examples` entry against the schema it sits on. Without this, an example
+  # missing a required field or using the wrong type lints clean — and `openapi:check` cannot
+  # catch it either, because the committed file and the served document change together.
+  no-invalid-schema-examples: error
   # Every operation must be identifiable, describable, and grouped.
   operation-operationId: error
   operation-operationId-unique: error

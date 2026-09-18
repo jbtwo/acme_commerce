@@ -1,5 +1,56 @@
 import { Type, type Static } from '@sinclair/typebox';
 
+/**
+ * A worked example of a price quote.
+ *
+ * Every number here reconciles, which for pricing is the entire point. Rules apply in
+ * ascending priority against the running subtotal, and each `amount_cents` is the difference
+ * the rule made to that subtotal rather than a percentage of the base price:
+ *
+ *   base            12900 x 3 = 38700
+ *   quantity_break   -5% of 38700 = -1935  -> 36765
+ *   customer_group  -10% of 36765 = -3677  -> 33088   (half-away-from-zero rounding)
+ *
+ * So `total_price_cents` is 33088 and the breakdown adds up to it. An example where the
+ * adjustments do not reconcile with the total is how a consumer learns to compute prices
+ * themselves instead of trusting the API.
+ */
+export const PRICE_QUOTE_EXAMPLE = {
+  sku: 'ACME-BAG-BLK',
+  currency: 'CAD',
+  quantity: 3,
+  base_price_cents: 12900,
+  adjustments: [
+    {
+      rule_id: 'prule_3a5c7e9f1b2d4f6a8c0e1b3d',
+      type: 'quantity_break',
+      description: 'Buy 10 or more — 5% off',
+      amount_cents: -1935,
+      applied: true,
+      skipped_reason: null,
+    },
+    {
+      rule_id: 'prule_7e9f1b3d5a7c9e1f2b4d6a8c',
+      type: 'customer_group',
+      description: 'Wholesale customers — 10% off',
+      amount_cents: -3677,
+      applied: true,
+      skipped_reason: null,
+    },
+    {
+      rule_id: 'prule_1b3d5f7a9c1e3f5a7b9d1c3e',
+      type: 'sale',
+      description: 'Autumn sale — 15% off Backpacks',
+      amount_cents: 0,
+      applied: false,
+      skipped_reason: 'rule has ended',
+    },
+  ],
+  effective_unit_price_cents: 11029,
+  total_price_cents: 33088,
+  applied_rule_ids: ['prule_3a5c7e9f1b2d4f6a8c0e1b3d', 'prule_7e9f1b3d5a7c9e1f2b4d6a8c'],
+};
+
 export const PriceAdjustmentSchema = Type.Object(
   {
     rule_id: Type.String({ description: 'The pricing rule considered.' }),
@@ -23,6 +74,7 @@ export const PriceAdjustmentSchema = Type.Object(
   },
   {
     $id: 'PriceAdjustment',
+    examples: [PRICE_QUOTE_EXAMPLE.adjustments[0]],
     title: 'PriceAdjustment',
     additionalProperties: false,
     description: 'One pricing rule and what it did.',
@@ -52,6 +104,7 @@ export const PriceQuoteSchema = Type.Object(
   },
   {
     $id: 'PriceQuote',
+    examples: [PRICE_QUOTE_EXAMPLE],
     title: 'PriceQuote',
     additionalProperties: false,
     description:
@@ -65,6 +118,7 @@ export const PriceQuoteResponseSchema = Type.Object(
   { data: Type.Unsafe<unknown>({ $ref: 'PriceQuote#' }) },
   {
     $id: 'PriceQuoteResponse',
+    examples: [{ data: PRICE_QUOTE_EXAMPLE }],
     title: 'PriceQuoteResponse',
     additionalProperties: false,
     description: 'An effective price and how it was reached.',

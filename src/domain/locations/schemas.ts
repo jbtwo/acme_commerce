@@ -1,6 +1,22 @@
 import { Type, type Static } from '@sinclair/typebox';
 import { idPatternString } from '../ids.js';
 
+/** A worked example of a location, shared with the envelopes that wrap it. */
+export const LOCATION_EXAMPLE = {
+  id: 'loc_2d7e9f1a3b5c7d9e1f2a3b4c',
+  name: 'Toronto Warehouse',
+  type: 'warehouse',
+  address_line1: '55 Commerce Court',
+  address_line2: 'Unit 4',
+  city: 'Toronto',
+  region: 'ON',
+  postal_code: 'M5L 1E2',
+  country: 'CA',
+  is_active: true,
+  created_at: '2025-01-09T11:02:41.000Z',
+  updated_at: '2025-01-09T11:02:41.000Z',
+};
+
 export const LOCATION_TYPES = ['warehouse', 'retail', 'virtual'] as const;
 export const LOCATION_SORT_FIELDS = ['name', 'type', 'created_at', 'updated_at'] as const;
 
@@ -46,6 +62,7 @@ export const LocationSchema = Type.Object(
   },
   {
     $id: 'Location',
+    examples: [LOCATION_EXAMPLE],
     title: 'Location',
     additionalProperties: false,
     description: 'A place where inventory is held.',
@@ -175,6 +192,7 @@ export const LocationResponseSchema = Type.Object(
   { data: Type.Unsafe<LocationResource>({ $ref: 'Location#' }) },
   {
     $id: 'LocationResponse',
+    examples: [{ data: LOCATION_EXAMPLE }],
     title: 'LocationResponse',
     additionalProperties: false,
     description: 'A single location.',
@@ -190,6 +208,9 @@ export const LocationListResponseSchema = Type.Object(
   },
   {
     $id: 'LocationListResponse',
+    examples: [
+      { data: [LOCATION_EXAMPLE], pagination: { page: 1, limit: 25, total: 3, total_pages: 1 } },
+    ],
     title: 'LocationListResponse',
     additionalProperties: false,
     description: 'A page of locations with pagination metadata.',

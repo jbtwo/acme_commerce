@@ -5,7 +5,7 @@
         "additionalProperties": false,
         "description": "Increase, decrease, or correct stock at one location.",
         "example": {
-          "location_id": "loc_...",
+          "location_id": "loc_2d7e9f1a3b5c7d9e1f2a3b4c",
           "quantity_delta": 25,
           "reason": "received",
           "reference": "PO-4471",
@@ -60,6 +60,28 @@
       "AdjustmentResponse": {
         "additionalProperties": false,
         "description": "The adjustment recorded, and the level it produced.",
+        "example": {
+          "data": {
+            "adjustment": {
+              "actor": "dev@acme.example",
+              "created_at": "2025-01-14T15:20:00.000Z",
+              "id": "invadj_6b3c1d8e2f0a9b7c5d4e3f21",
+              "location_id": "loc_2d7e9f1a3b5c7d9e1f2a3b4c",
+              "location_name": "Toronto Warehouse",
+              "quantity_delta": 24,
+              "reason": "received",
+              "reference": "PO-2025-0114",
+              "sku": "ACME-BAG-BLK"
+            },
+            "level": {
+              "available": 126,
+              "location_id": "loc_2d7e9f1a3b5c7d9e1f2a3b4c",
+              "on_hand": 144,
+              "reserved": 18,
+              "sku": "ACME-BAG-BLK"
+            }
+          }
+        },
         "properties": {
           "data": {
             "additionalProperties": false,
@@ -176,6 +198,13 @@
       "HealthResponse": {
         "additionalProperties": false,
         "description": "Liveness. Answered from process state alone; no dependency is contacted.",
+        "example": {
+          "environment": "production",
+          "service": "acme-commerce",
+          "status": "ok",
+          "uptime_seconds": 84021.7,
+          "version": "0.3.0"
+        },
         "properties": {
           "environment": {
             "description": "Configured APP_ENV: development, test, or production.",
@@ -214,6 +243,27 @@
       "HistoryResponse": {
         "additionalProperties": false,
         "description": "A page of inventory adjustments.",
+        "example": {
+          "data": [
+            {
+              "actor": "dev@acme.example",
+              "created_at": "2025-01-14T15:20:00.000Z",
+              "id": "invadj_6b3c1d8e2f0a9b7c5d4e3f21",
+              "location_id": "loc_2d7e9f1a3b5c7d9e1f2a3b4c",
+              "location_name": "Toronto Warehouse",
+              "quantity_delta": 24,
+              "reason": "received",
+              "reference": "PO-2025-0114",
+              "sku": "ACME-BAG-BLK"
+            }
+          ],
+          "pagination": {
+            "limit": 25,
+            "page": 1,
+            "total": 7,
+            "total_pages": 1
+          }
+        },
         "properties": {
           "data": {
             "description": "A page of audit-log entries, newest first.",
@@ -236,6 +286,22 @@
       "Identity": {
         "additionalProperties": false,
         "description": "The authenticated caller, as the server currently understands them.",
+        "example": {
+          "email": "dev@acme.example",
+          "id": "usr_4c1f8e2a7b9d0c3e5f6a8b1d",
+          "name": "Devon Reyes",
+          "permissions": [
+            "catalog:read",
+            "catalog:write",
+            "locations:read",
+            "locations:write",
+            "inventory:read",
+            "inventory:write",
+            "pricing:read"
+          ],
+          "role": "developer",
+          "token_expires_at": "2025-01-14T16:20:00.000Z"
+        },
         "properties": {
           "email": {
             "description": "Email address.",
@@ -295,6 +361,24 @@
       "IdentityResponse": {
         "additionalProperties": false,
         "description": "The identity behind the presented token.",
+        "example": {
+          "data": {
+            "email": "dev@acme.example",
+            "id": "usr_4c1f8e2a7b9d0c3e5f6a8b1d",
+            "name": "Devon Reyes",
+            "permissions": [
+              "catalog:read",
+              "catalog:write",
+              "locations:read",
+              "locations:write",
+              "inventory:read",
+              "inventory:write",
+              "pricing:read"
+            ],
+            "role": "developer",
+            "token_expires_at": "2025-01-14T16:20:00.000Z"
+          }
+        },
         "properties": {
           "data": {
             "$ref": "#/components/schemas/Identity"
@@ -309,6 +393,17 @@
       "InventoryAdjustment": {
         "additionalProperties": false,
         "description": "One entry in the append-only stock audit log.",
+        "example": {
+          "actor": "dev@acme.example",
+          "created_at": "2025-01-14T15:20:00.000Z",
+          "id": "invadj_6b3c1d8e2f0a9b7c5d4e3f21",
+          "location_id": "loc_2d7e9f1a3b5c7d9e1f2a3b4c",
+          "location_name": "Toronto Warehouse",
+          "quantity_delta": 24,
+          "reason": "received",
+          "reference": "PO-2025-0114",
+          "sku": "ACME-BAG-BLK"
+        },
         "properties": {
           "actor": {
             "description": "Who did it — taken from the bearer token, never from the body.",
@@ -377,6 +472,15 @@
       "InventoryLevel": {
         "additionalProperties": false,
         "description": "Stock for one SKU at one location.",
+        "example": {
+          "available": 102,
+          "location_id": "loc_2d7e9f1a3b5c7d9e1f2a3b4c",
+          "location_name": "Toronto Warehouse",
+          "on_hand": 120,
+          "reserved": 18,
+          "sku": "ACME-BAG-BLK",
+          "updated_at": "2025-01-14T15:20:00.000Z"
+        },
         "properties": {
           "available": {
             "description": "What can still be reserved or sold: `on_hand - reserved`. **Computed, never stored** — a third stored number is the first thing to disagree with the other two.",
@@ -426,6 +530,25 @@
       "InventoryListResponse": {
         "additionalProperties": false,
         "description": "A page of inventory levels.",
+        "example": {
+          "data": [
+            {
+              "available": 102,
+              "location_id": "loc_2d7e9f1a3b5c7d9e1f2a3b4c",
+              "location_name": "Toronto Warehouse",
+              "on_hand": 120,
+              "reserved": 18,
+              "sku": "ACME-BAG-BLK",
+              "updated_at": "2025-01-14T15:20:00.000Z"
+            }
+          ],
+          "pagination": {
+            "limit": 25,
+            "page": 1,
+            "total": 2,
+            "total_pages": 1
+          }
+        },
         "properties": {
           "data": {
             "description": "A page of stock levels.",
@@ -448,6 +571,18 @@
       "InventoryReservation": {
         "additionalProperties": false,
         "description": "A temporary hold on stock.",
+        "example": {
+          "actor": "dev@acme.example",
+          "created_at": "2025-01-14T15:20:00.000Z",
+          "expires_at": "2025-01-14T15:50:00.000Z",
+          "id": "invres_8d2e4f6a0b1c3d5e7f9a2b4c",
+          "location_id": "loc_2d7e9f1a3b5c7d9e1f2a3b4c",
+          "quantity": 2,
+          "reference": "cart_9f8e7d6c",
+          "released_at": null,
+          "sku": "ACME-BAG-BLK",
+          "status": "active"
+        },
         "properties": {
           "actor": {
             "description": "Who reserved it.",
@@ -524,6 +659,20 @@
       "Location": {
         "additionalProperties": false,
         "description": "A place where inventory is held.",
+        "example": {
+          "address_line1": "55 Commerce Court",
+          "address_line2": "Unit 4",
+          "city": "Toronto",
+          "country": "CA",
+          "created_at": "2025-01-09T11:02:41.000Z",
+          "id": "loc_2d7e9f1a3b5c7d9e1f2a3b4c",
+          "is_active": true,
+          "name": "Toronto Warehouse",
+          "postal_code": "M5L 1E2",
+          "region": "ON",
+          "type": "warehouse",
+          "updated_at": "2025-01-09T11:02:41.000Z"
+        },
         "properties": {
           "address_line1": {
             "description": "Street address. Null for a virtual location.",
@@ -699,6 +848,30 @@
       "LocationListResponse": {
         "additionalProperties": false,
         "description": "A page of locations with pagination metadata.",
+        "example": {
+          "data": [
+            {
+              "address_line1": "55 Commerce Court",
+              "address_line2": "Unit 4",
+              "city": "Toronto",
+              "country": "CA",
+              "created_at": "2025-01-09T11:02:41.000Z",
+              "id": "loc_2d7e9f1a3b5c7d9e1f2a3b4c",
+              "is_active": true,
+              "name": "Toronto Warehouse",
+              "postal_code": "M5L 1E2",
+              "region": "ON",
+              "type": "warehouse",
+              "updated_at": "2025-01-09T11:02:41.000Z"
+            }
+          ],
+          "pagination": {
+            "limit": 25,
+            "page": 1,
+            "total": 3,
+            "total_pages": 1
+          }
+        },
         "properties": {
           "data": {
             "description": "The requested page of locations.",
@@ -721,6 +894,22 @@
       "LocationResponse": {
         "additionalProperties": false,
         "description": "A single location.",
+        "example": {
+          "data": {
+            "address_line1": "55 Commerce Court",
+            "address_line2": "Unit 4",
+            "city": "Toronto",
+            "country": "CA",
+            "created_at": "2025-01-09T11:02:41.000Z",
+            "id": "loc_2d7e9f1a3b5c7d9e1f2a3b4c",
+            "is_active": true,
+            "name": "Toronto Warehouse",
+            "postal_code": "M5L 1E2",
+            "region": "ON",
+            "type": "warehouse",
+            "updated_at": "2025-01-09T11:02:41.000Z"
+          }
+        },
         "properties": {
           "data": {
             "$ref": "#/components/schemas/Location"
@@ -814,6 +1003,12 @@
       "Pagination": {
         "additionalProperties": false,
         "description": "Offset pagination metadata, present on every collection response.",
+        "example": {
+          "limit": 25,
+          "page": 1,
+          "total": 42,
+          "total_pages": 2
+        },
         "properties": {
           "limit": {
             "description": "The page size that was applied.",
@@ -848,6 +1043,14 @@
       "PriceAdjustment": {
         "additionalProperties": false,
         "description": "One pricing rule and what it did.",
+        "example": {
+          "amount_cents": -1935,
+          "applied": true,
+          "description": "Buy 10 or more — 5% off",
+          "rule_id": "prule_3a5c7e9f1b2d4f6a8c0e1b3d",
+          "skipped_reason": null,
+          "type": "quantity_break"
+        },
         "properties": {
           "amount_cents": {
             "description": "Signed change this rule made to the running subtotal, in minor units. Negative is a discount. Zero when `applied` is false.",
@@ -891,6 +1094,44 @@
       "PriceQuote": {
         "additionalProperties": false,
         "description": "An effective price with its full derivation. Rules apply in ascending priority, each against the running subtotal rather than the base price — so two 10% discounts compound to 19%, not 20%. Each step rounds to a whole minor unit, half away from zero.",
+        "example": {
+          "adjustments": [
+            {
+              "amount_cents": -1935,
+              "applied": true,
+              "description": "Buy 10 or more — 5% off",
+              "rule_id": "prule_3a5c7e9f1b2d4f6a8c0e1b3d",
+              "skipped_reason": null,
+              "type": "quantity_break"
+            },
+            {
+              "amount_cents": -3677,
+              "applied": true,
+              "description": "Wholesale customers — 10% off",
+              "rule_id": "prule_7e9f1b3d5a7c9e1f2b4d6a8c",
+              "skipped_reason": null,
+              "type": "customer_group"
+            },
+            {
+              "amount_cents": 0,
+              "applied": false,
+              "description": "Autumn sale — 15% off Backpacks",
+              "rule_id": "prule_1b3d5f7a9c1e3f5a7b9d1c3e",
+              "skipped_reason": "rule has ended",
+              "type": "sale"
+            }
+          ],
+          "applied_rule_ids": [
+            "prule_3a5c7e9f1b2d4f6a8c0e1b3d",
+            "prule_7e9f1b3d5a7c9e1f2b4d6a8c"
+          ],
+          "base_price_cents": 12900,
+          "currency": "CAD",
+          "effective_unit_price_cents": 11029,
+          "quantity": 3,
+          "sku": "ACME-BAG-BLK",
+          "total_price_cents": 33088
+        },
         "properties": {
           "adjustments": {
             "description": "Every rule considered, in the order applied (ascending priority). Applied and skipped rules are both present.",
@@ -948,6 +1189,46 @@
       "PriceQuoteResponse": {
         "additionalProperties": false,
         "description": "An effective price and how it was reached.",
+        "example": {
+          "data": {
+            "adjustments": [
+              {
+                "amount_cents": -1935,
+                "applied": true,
+                "description": "Buy 10 or more — 5% off",
+                "rule_id": "prule_3a5c7e9f1b2d4f6a8c0e1b3d",
+                "skipped_reason": null,
+                "type": "quantity_break"
+              },
+              {
+                "amount_cents": -3677,
+                "applied": true,
+                "description": "Wholesale customers — 10% off",
+                "rule_id": "prule_7e9f1b3d5a7c9e1f2b4d6a8c",
+                "skipped_reason": null,
+                "type": "customer_group"
+              },
+              {
+                "amount_cents": 0,
+                "applied": false,
+                "description": "Autumn sale — 15% off Backpacks",
+                "rule_id": "prule_1b3d5f7a9c1e3f5a7b9d1c3e",
+                "skipped_reason": "rule has ended",
+                "type": "sale"
+              }
+            ],
+            "applied_rule_ids": [
+              "prule_3a5c7e9f1b2d4f6a8c0e1b3d",
+              "prule_7e9f1b3d5a7c9e1f2b4d6a8c"
+            ],
+            "base_price_cents": 12900,
+            "currency": "CAD",
+            "effective_unit_price_cents": 11029,
+            "quantity": 3,
+            "sku": "ACME-BAG-BLK",
+            "total_price_cents": 33088
+          }
+        },
         "properties": {
           "data": {
             "$ref": "#/components/schemas/PriceQuote"
@@ -962,6 +1243,22 @@
       "Product": {
         "additionalProperties": false,
         "description": "A sellable item in the Acme Commerce catalog. A product carries merchandising information; the purchasable units with SKUs and prices are its variants.",
+        "example": {
+          "archived_at": null,
+          "created_at": "2025-01-09T11:02:41.000Z",
+          "description": "A 30-litre hiking pack with a vented back panel and a rain cover.",
+          "id": "prod_7ebf51270d4d3de9f7acad4c",
+          "product_type": "Backpacks",
+          "status": "active",
+          "tags": [
+            "outdoor",
+            "hiking",
+            "bestseller"
+          ],
+          "title": "Trailhead 30L Backpack",
+          "updated_at": "2025-01-14T15:20:00.000Z",
+          "vendor": "Acme"
+        },
         "properties": {
           "archived_at": {
             "description": "When the product was archived. Non-null exactly when `status` is `archived`.",
@@ -1127,6 +1424,32 @@
       "ProductListResponse": {
         "additionalProperties": false,
         "description": "A page of products plus the pagination metadata needed to fetch the rest.",
+        "example": {
+          "data": [
+            {
+              "archived_at": null,
+              "created_at": "2025-01-09T11:02:41.000Z",
+              "description": "A 30-litre hiking pack with a vented back panel and a rain cover.",
+              "id": "prod_7ebf51270d4d3de9f7acad4c",
+              "product_type": "Backpacks",
+              "status": "active",
+              "tags": [
+                "outdoor",
+                "hiking",
+                "bestseller"
+              ],
+              "title": "Trailhead 30L Backpack",
+              "updated_at": "2025-01-14T15:20:00.000Z",
+              "vendor": "Acme"
+            }
+          ],
+          "pagination": {
+            "limit": 25,
+            "page": 1,
+            "total": 42,
+            "total_pages": 2
+          }
+        },
         "properties": {
           "data": {
             "description": "The requested page of products. Empty when nothing matches.",
@@ -1149,6 +1472,24 @@
       "ProductResponse": {
         "additionalProperties": false,
         "description": "A single product.",
+        "example": {
+          "data": {
+            "archived_at": null,
+            "created_at": "2025-01-09T11:02:41.000Z",
+            "description": "A 30-litre hiking pack with a vented back panel and a rain cover.",
+            "id": "prod_7ebf51270d4d3de9f7acad4c",
+            "product_type": "Backpacks",
+            "status": "active",
+            "tags": [
+              "outdoor",
+              "hiking",
+              "bestseller"
+            ],
+            "title": "Trailhead 30L Backpack",
+            "updated_at": "2025-01-14T15:20:00.000Z",
+            "vendor": "Acme"
+          }
+        },
         "properties": {
           "data": {
             "$ref": "#/components/schemas/Product"
@@ -1228,6 +1569,27 @@
       "ReadinessResponse": {
         "additionalProperties": false,
         "description": "Readiness. Returns 200 when the application can serve API traffic and 503 when it cannot. The body shape is identical for both, so a client parses one thing.",
+        "example": {
+          "checked_at": "2025-01-14T15:20:00.000Z",
+          "checks": {
+            "configuration": {
+              "detail": "Configuration loaded.",
+              "duration_ms": 0.1,
+              "status": "ok"
+            },
+            "database": {
+              "detail": "SELECT 1 succeeded.",
+              "duration_ms": 3.4,
+              "status": "ok"
+            },
+            "migrations": {
+              "detail": "All 3 migrations applied.",
+              "duration_ms": 2.1,
+              "status": "ok"
+            }
+          },
+          "status": "ready"
+        },
         "properties": {
           "checked_at": {
             "description": "When these checks ran. Results are not cached.",
@@ -1348,7 +1710,7 @@
         "additionalProperties": false,
         "description": "Hold stock for a pending transaction.",
         "example": {
-          "location_id": "loc_...",
+          "location_id": "loc_2d7e9f1a3b5c7d9e1f2a3b4c",
           "quantity": 2,
           "reference": "cart_9931",
           "sku": "ACME-BAG-BLK",
@@ -1397,6 +1759,20 @@
       "ReservationResponse": {
         "additionalProperties": false,
         "description": "A single reservation.",
+        "example": {
+          "data": {
+            "actor": "dev@acme.example",
+            "created_at": "2025-01-14T15:20:00.000Z",
+            "expires_at": "2025-01-14T15:50:00.000Z",
+            "id": "invres_8d2e4f6a0b1c3d5e7f9a2b4c",
+            "location_id": "loc_2d7e9f1a3b5c7d9e1f2a3b4c",
+            "quantity": 2,
+            "reference": "cart_9f8e7d6c",
+            "released_at": null,
+            "sku": "ACME-BAG-BLK",
+            "status": "active"
+          }
+        },
         "properties": {
           "data": {
             "$ref": "#/components/schemas/InventoryReservation"
@@ -1411,6 +1787,35 @@
       "SkuInventory": {
         "additionalProperties": false,
         "description": "Availability for one SKU across every location.",
+        "example": {
+          "locations": [
+            {
+              "available": 102,
+              "location_id": "loc_2d7e9f1a3b5c7d9e1f2a3b4c",
+              "location_name": "Toronto Warehouse",
+              "on_hand": 120,
+              "reserved": 18,
+              "sku": "ACME-BAG-BLK",
+              "updated_at": "2025-01-14T15:20:00.000Z"
+            },
+            {
+              "available": 38,
+              "location_id": "loc_5f1a3b7c9d2e4f6a8b0c1d3e",
+              "location_name": "Barrie Retail Location",
+              "on_hand": 40,
+              "reserved": 2,
+              "sku": "ACME-BAG-BLK",
+              "updated_at": "2025-01-13T09:41:12.000Z"
+            }
+          ],
+          "sku": "ACME-BAG-BLK",
+          "totals": {
+            "available": 140,
+            "on_hand": 160,
+            "reserved": 20
+          },
+          "tracked": true
+        },
         "properties": {
           "locations": {
             "description": "Per-location breakdown. A location with no stock row for this SKU is absent, not zero.",
@@ -1464,6 +1869,37 @@
       "SkuInventoryResponse": {
         "additionalProperties": false,
         "description": "Availability for one SKU.",
+        "example": {
+          "data": {
+            "locations": [
+              {
+                "available": 102,
+                "location_id": "loc_2d7e9f1a3b5c7d9e1f2a3b4c",
+                "location_name": "Toronto Warehouse",
+                "on_hand": 120,
+                "reserved": 18,
+                "sku": "ACME-BAG-BLK",
+                "updated_at": "2025-01-14T15:20:00.000Z"
+              },
+              {
+                "available": 38,
+                "location_id": "loc_5f1a3b7c9d2e4f6a8b0c1d3e",
+                "location_name": "Barrie Retail Location",
+                "on_hand": 40,
+                "reserved": 2,
+                "sku": "ACME-BAG-BLK",
+                "updated_at": "2025-01-13T09:41:12.000Z"
+              }
+            ],
+            "sku": "ACME-BAG-BLK",
+            "totals": {
+              "available": 140,
+              "on_hand": 160,
+              "reserved": 20
+            },
+            "tracked": true
+          }
+        },
         "properties": {
           "data": {
             "$ref": "#/components/schemas/SkuInventory"
@@ -1506,6 +1942,30 @@
       "TokenResponse": {
         "additionalProperties": false,
         "description": "A newly issued development bearer token, with the identity it represents.",
+        "example": {
+          "data": {
+            "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.<payload>.<signature>",
+            "expires_at": "2025-01-14T16:20:00.000Z",
+            "expires_in": 3600,
+            "principal": {
+              "email": "dev@acme.example",
+              "id": "usr_4c1f8e2a7b9d0c3e5f6a8b1d",
+              "name": "Devon Reyes",
+              "permissions": [
+                "catalog:read",
+                "catalog:write",
+                "locations:read",
+                "locations:write",
+                "inventory:read",
+                "inventory:write",
+                "pricing:read"
+              ],
+              "role": "developer",
+              "token_expires_at": "2025-01-14T16:20:00.000Z"
+            },
+            "token_type": "Bearer"
+          }
+        },
         "properties": {
           "data": {
             "additionalProperties": false,
@@ -1553,6 +2013,22 @@
       "Variant": {
         "additionalProperties": false,
         "description": "A purchasable unit of a product: one SKU, one price. Inventory and orders reference variants, not products.",
+        "example": {
+          "archived_at": null,
+          "barcode": "0062100000017",
+          "compare_at_price_cents": 14900,
+          "created_at": "2025-01-09T11:02:41.000Z",
+          "currency": "CAD",
+          "id": "var_1a2b3c4d5e6f708192a3b4c5",
+          "inventory_item_id": "invitem_9f81c0a7b6d5e4f3a2b1c0d9",
+          "position": 1,
+          "price_cents": 12900,
+          "product_id": "prod_7ebf51270d4d3de9f7acad4c",
+          "sku": "ACME-BAG-BLK",
+          "status": "active",
+          "title": "Black",
+          "updated_at": "2025-01-14T15:20:00.000Z"
+        },
         "properties": {
           "archived_at": {
             "description": "When the variant was archived. Non-null exactly when `status` is `archived`.",
@@ -1728,6 +2204,26 @@
       "VariantListResponse": {
         "additionalProperties": false,
         "description": "Every variant belonging to one product, unpaginated.",
+        "example": {
+          "data": [
+            {
+              "archived_at": null,
+              "barcode": "0062100000017",
+              "compare_at_price_cents": 14900,
+              "created_at": "2025-01-09T11:02:41.000Z",
+              "currency": "CAD",
+              "id": "var_1a2b3c4d5e6f708192a3b4c5",
+              "inventory_item_id": "invitem_9f81c0a7b6d5e4f3a2b1c0d9",
+              "position": 1,
+              "price_cents": 12900,
+              "product_id": "prod_7ebf51270d4d3de9f7acad4c",
+              "sku": "ACME-BAG-BLK",
+              "status": "active",
+              "title": "Black",
+              "updated_at": "2025-01-14T15:20:00.000Z"
+            }
+          ]
+        },
         "properties": {
           "data": {
             "description": "All variants of the product, ordered by `position` then `id`. This sub-collection is not paginated: a product has tens of variants, not thousands. The response is capped at 250.",
@@ -1747,6 +2243,24 @@
       "VariantResponse": {
         "additionalProperties": false,
         "description": "A single variant.",
+        "example": {
+          "data": {
+            "archived_at": null,
+            "barcode": "0062100000017",
+            "compare_at_price_cents": 14900,
+            "created_at": "2025-01-09T11:02:41.000Z",
+            "currency": "CAD",
+            "id": "var_1a2b3c4d5e6f708192a3b4c5",
+            "inventory_item_id": "invitem_9f81c0a7b6d5e4f3a2b1c0d9",
+            "position": 1,
+            "price_cents": 12900,
+            "product_id": "prod_7ebf51270d4d3de9f7acad4c",
+            "sku": "ACME-BAG-BLK",
+            "status": "active",
+            "title": "Black",
+            "updated_at": "2025-01-14T15:20:00.000Z"
+          }
+        },
         "properties": {
           "data": {
             "$ref": "#/components/schemas/Variant"

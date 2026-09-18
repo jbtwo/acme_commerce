@@ -69,6 +69,52 @@ export const MAX_VARIANTS_PER_PRODUCT = 250;
 // Resource representations
 // ---------------------------------------------------------------------------
 
+/**
+ * Worked examples, shared between the entity schemas and the response envelopes that wrap
+ * them.
+ *
+ * Defined once as constants rather than written out per schema for the obvious reason — an
+ * example that disagrees with the one three schemas down is worse than no example, because a
+ * consumer cannot tell which is authoritative. The values are the deterministic seed IDs and
+ * real seeded SKUs, so an example can be pasted into a request against a seeded database and
+ * will actually resolve.
+ *
+ * These feed the OpenAPI document, which in turn feeds generated collections and mock servers.
+ * A mock is only as good as the examples behind it.
+ */
+export const PRODUCT_EXAMPLE = {
+  id: 'prod_7ebf51270d4d3de9f7acad4c',
+  title: 'Trailhead 30L Backpack',
+  description: 'A 30-litre hiking pack with a vented back panel and a rain cover.',
+  status: 'active',
+  vendor: 'Acme',
+  product_type: 'Backpacks',
+  tags: ['outdoor', 'hiking', 'bestseller'],
+  created_at: '2025-01-09T11:02:41.000Z',
+  updated_at: '2025-01-14T15:20:00.000Z',
+  archived_at: null,
+};
+
+export const VARIANT_EXAMPLE = {
+  id: 'var_1a2b3c4d5e6f708192a3b4c5',
+  product_id: 'prod_7ebf51270d4d3de9f7acad4c',
+  sku: 'ACME-BAG-BLK',
+  title: 'Black',
+  price_cents: 12900,
+  compare_at_price_cents: 14900,
+  currency: 'CAD',
+  barcode: '0062100000017',
+  inventory_item_id: 'invitem_9f81c0a7b6d5e4f3a2b1c0d9',
+  status: 'active',
+  position: 1,
+  created_at: '2025-01-09T11:02:41.000Z',
+  updated_at: '2025-01-14T15:20:00.000Z',
+  archived_at: null,
+};
+
+/** `total_pages` reconciles with `Math.ceil(total / limit)`. An example that does not is a bug. */
+export const PAGINATION_EXAMPLE = { page: 1, limit: 25, total: 42, total_pages: 2 };
+
 export const ProductSchema = Type.Object(
   {
     id: Type.String({
@@ -131,6 +177,7 @@ export const ProductSchema = Type.Object(
       'A sellable item in the Acme Commerce catalog. A product carries merchandising ' +
       'information; the purchasable units with SKUs and prices are its variants.',
     additionalProperties: false,
+    examples: [PRODUCT_EXAMPLE],
   },
 );
 export type ProductResource = Static<typeof ProductSchema>;
@@ -216,6 +263,7 @@ export const VariantSchema = Type.Object(
       'A purchasable unit of a product: one SKU, one price. Inventory and orders reference ' +
       'variants, not products.',
     additionalProperties: false,
+    examples: [VARIANT_EXAMPLE],
   },
 );
 export type VariantResource = Static<typeof VariantSchema>;
@@ -574,6 +622,7 @@ export const PaginationSchema = Type.Object(
     title: 'Pagination',
     description: 'Offset pagination metadata, present on every collection response.',
     additionalProperties: false,
+    examples: [PAGINATION_EXAMPLE],
   },
 );
 
@@ -642,6 +691,7 @@ export const ProductResponseSchema = Type.Object(
     title: 'ProductResponse',
     description: 'A single product.',
     additionalProperties: false,
+    examples: [{ data: PRODUCT_EXAMPLE }],
   },
 );
 
@@ -657,6 +707,7 @@ export const ProductListResponseSchema = Type.Object(
     title: 'ProductListResponse',
     description: 'A page of products plus the pagination metadata needed to fetch the rest.',
     additionalProperties: false,
+    examples: [{ data: [PRODUCT_EXAMPLE], pagination: PAGINATION_EXAMPLE }],
   },
 );
 
@@ -667,6 +718,7 @@ export const VariantResponseSchema = Type.Object(
     title: 'VariantResponse',
     description: 'A single variant.',
     additionalProperties: false,
+    examples: [{ data: VARIANT_EXAMPLE }],
   },
 );
 
@@ -685,6 +737,7 @@ export const VariantListResponseSchema = Type.Object(
     title: 'VariantListResponse',
     description: 'Every variant belonging to one product, unpaginated.',
     additionalProperties: false,
+    examples: [{ data: [VARIANT_EXAMPLE] }],
   },
 );
 

@@ -1,6 +1,68 @@
 import { Type, type Static } from '@sinclair/typebox';
 import { idPatternString } from '../ids.js';
 
+/**
+ * Worked examples for inventory, shared across the entity schemas and their envelopes.
+ *
+ * The arithmetic reconciles on purpose: `available` is `on_hand - reserved` everywhere it
+ * appears, and the network totals in SKU_INVENTORY_EXAMPLE are the sum of the per-location
+ * rows beneath them. An inventory example that does not add up teaches a consumer to distrust
+ * the numbers, which is the opposite of what an example is for.
+ */
+export const INVENTORY_LEVEL_EXAMPLE = {
+  sku: 'ACME-BAG-BLK',
+  location_id: 'loc_2d7e9f1a3b5c7d9e1f2a3b4c',
+  location_name: 'Toronto Warehouse',
+  on_hand: 120,
+  reserved: 18,
+  available: 102,
+  updated_at: '2025-01-14T15:20:00.000Z',
+};
+
+export const INVENTORY_ADJUSTMENT_EXAMPLE = {
+  id: 'invadj_6b3c1d8e2f0a9b7c5d4e3f21',
+  sku: 'ACME-BAG-BLK',
+  location_id: 'loc_2d7e9f1a3b5c7d9e1f2a3b4c',
+  location_name: 'Toronto Warehouse',
+  quantity_delta: 24,
+  reason: 'received',
+  reference: 'PO-2025-0114',
+  actor: 'dev@acme.example',
+  created_at: '2025-01-14T15:20:00.000Z',
+};
+
+export const INVENTORY_RESERVATION_EXAMPLE = {
+  id: 'invres_8d2e4f6a0b1c3d5e7f9a2b4c',
+  sku: 'ACME-BAG-BLK',
+  location_id: 'loc_2d7e9f1a3b5c7d9e1f2a3b4c',
+  quantity: 2,
+  status: 'active',
+  reference: 'cart_9f8e7d6c',
+  actor: 'dev@acme.example',
+  expires_at: '2025-01-14T15:50:00.000Z',
+  released_at: null,
+  created_at: '2025-01-14T15:20:00.000Z',
+};
+
+/** Two locations, and the totals are their sum: 120 + 40 on hand, 18 + 2 reserved. */
+export const SKU_INVENTORY_EXAMPLE = {
+  sku: 'ACME-BAG-BLK',
+  tracked: true,
+  totals: { on_hand: 160, reserved: 20, available: 140 },
+  locations: [
+    INVENTORY_LEVEL_EXAMPLE,
+    {
+      sku: 'ACME-BAG-BLK',
+      location_id: 'loc_5f1a3b7c9d2e4f6a8b0c1d3e',
+      location_name: 'Barrie Retail Location',
+      on_hand: 40,
+      reserved: 2,
+      available: 38,
+      updated_at: '2025-01-13T09:41:12.000Z',
+    },
+  ],
+};
+
 export const ADJUSTMENT_REASONS = [
   'received',
   'sold',
@@ -49,6 +111,7 @@ export const InventoryLevelSchema = Type.Object(
   },
   {
     $id: 'InventoryLevel',
+    examples: [INVENTORY_LEVEL_EXAMPLE],
     title: 'InventoryLevel',
     additionalProperties: false,
     description: 'Stock for one SKU at one location.',
@@ -75,6 +138,7 @@ export const SkuInventorySchema = Type.Object(
   },
   {
     $id: 'SkuInventory',
+    examples: [SKU_INVENTORY_EXAMPLE],
     title: 'SkuInventory',
     additionalProperties: false,
     description: 'Availability for one SKU across every location.',
@@ -108,6 +172,7 @@ export const AdjustmentSchema = Type.Object(
   },
   {
     $id: 'InventoryAdjustment',
+    examples: [INVENTORY_ADJUSTMENT_EXAMPLE],
     title: 'InventoryAdjustment',
     additionalProperties: false,
     description: 'One entry in the append-only stock audit log.',
@@ -143,6 +208,7 @@ export const ReservationSchema = Type.Object(
   },
   {
     $id: 'InventoryReservation',
+    examples: [INVENTORY_RESERVATION_EXAMPLE],
     title: 'InventoryReservation',
     additionalProperties: false,
     description: 'A temporary hold on stock.',
@@ -178,7 +244,7 @@ export const AdjustmentRequestSchema = Type.Object(
     examples: [
       {
         sku: 'ACME-BAG-BLK',
-        location_id: 'loc_...',
+        location_id: 'loc_2d7e9f1a3b5c7d9e1f2a3b4c',
         quantity_delta: 25,
         reason: 'received',
         reference: 'PO-4471',
@@ -220,7 +286,7 @@ export const ReservationRequestSchema = Type.Object(
     examples: [
       {
         sku: 'ACME-BAG-BLK',
-        location_id: 'loc_...',
+        location_id: 'loc_2d7e9f1a3b5c7d9e1f2a3b4c',
         quantity: 2,
         reference: 'cart_9931',
         ttl_seconds: 900,
@@ -319,6 +385,12 @@ export const InventoryListResponseSchema = Type.Object(
   },
   {
     $id: 'InventoryListResponse',
+    examples: [
+      {
+        data: [INVENTORY_LEVEL_EXAMPLE],
+        pagination: { page: 1, limit: 25, total: 2, total_pages: 1 },
+      },
+    ],
     title: 'InventoryListResponse',
     additionalProperties: false,
     description: 'A page of inventory levels.',
@@ -329,6 +401,7 @@ export const SkuInventoryResponseSchema = Type.Object(
   { data: Type.Unsafe<unknown>({ $ref: 'SkuInventory#' }) },
   {
     $id: 'SkuInventoryResponse',
+    examples: [{ data: SKU_INVENTORY_EXAMPLE }],
     title: 'SkuInventoryResponse',
     additionalProperties: false,
     description: 'Availability for one SKU.',
@@ -359,6 +432,20 @@ export const AdjustmentResponseSchema = Type.Object(
   },
   {
     $id: 'AdjustmentResponse',
+    examples: [
+      {
+        data: {
+          adjustment: INVENTORY_ADJUSTMENT_EXAMPLE,
+          level: {
+            sku: 'ACME-BAG-BLK',
+            location_id: 'loc_2d7e9f1a3b5c7d9e1f2a3b4c',
+            on_hand: 144,
+            reserved: 18,
+            available: 126,
+          },
+        },
+      },
+    ],
     title: 'AdjustmentResponse',
     additionalProperties: false,
     description: 'The adjustment recorded, and the level it produced.',
@@ -374,6 +461,12 @@ export const HistoryResponseSchema = Type.Object(
   },
   {
     $id: 'HistoryResponse',
+    examples: [
+      {
+        data: [INVENTORY_ADJUSTMENT_EXAMPLE],
+        pagination: { page: 1, limit: 25, total: 7, total_pages: 1 },
+      },
+    ],
     title: 'HistoryResponse',
     additionalProperties: false,
     description: 'A page of inventory adjustments.',
@@ -384,6 +477,7 @@ export const ReservationResponseSchema = Type.Object(
   { data: Type.Unsafe<unknown>({ $ref: 'InventoryReservation#' }) },
   {
     $id: 'ReservationResponse',
+    examples: [{ data: INVENTORY_RESERVATION_EXAMPLE }],
     title: 'ReservationResponse',
     additionalProperties: false,
     description: 'A single reservation.',

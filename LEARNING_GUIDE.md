@@ -823,8 +823,22 @@ product answer, and it is not "no, mocks are just static examples".
 
 The examples in `openapi/openapi.json` are not decoration — for an example-based mock they
 _become_ its behaviour. A thin example produces a useless mock, which is a concrete reason to
-write good ones. This project's contract tests already assert that the documented `ProductCreate`
-and `VariantCreate` examples are accepted by the real API, so they cannot quietly go stale.
+write good ones.
+
+Every one of the 37 component schemas carries a worked example, on the response envelopes as
+well as the request bodies, and the numbers in them reconcile: `available` is
+`on_hand - reserved`, a SKU's network totals are the sum of its per-location rows,
+`total_pages` is `Math.ceil(total / limit)`, and the price-quote breakdown adds up to its own
+total. That is deliberate. An example whose arithmetic does not hold teaches a consumer to
+distrust the API and compute things themselves, which is the opposite of what an example is
+for.
+
+Two mechanisms stop them going stale. The contract tests assert that the documented
+`ProductCreate` and `VariantCreate` examples are accepted by the real API. And
+`redocly.yaml` enables `no-invalid-schema-examples: error`, so `npm run openapi:lint` fails the
+build when an example gains a wrong type or loses a required field — a defect that
+`openapi:check` cannot catch on its own, because the committed document and the served one
+change together.
 
 ### What a mock cannot do
 

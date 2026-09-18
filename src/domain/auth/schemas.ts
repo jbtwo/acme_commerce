@@ -1,6 +1,30 @@
 import { Type, type Static } from '@sinclair/typebox';
 import { PERMISSIONS, ROLES } from './permissions.js';
 
+/**
+ * A worked example of the authenticated caller, shared by every schema that embeds one.
+ *
+ * The `developer` role deliberately, since that is the seeded account the collection
+ * authenticates as. The token is truncated — a realistic-looking but non-functional JWT, so
+ * nobody copies it out of the documentation and wonders why it is rejected.
+ */
+export const IDENTITY_EXAMPLE = {
+  id: 'usr_4c1f8e2a7b9d0c3e5f6a8b1d',
+  email: 'dev@acme.example',
+  name: 'Devon Reyes',
+  role: 'developer',
+  permissions: [
+    'catalog:read',
+    'catalog:write',
+    'locations:read',
+    'locations:write',
+    'inventory:read',
+    'inventory:write',
+    'pricing:read',
+  ],
+  token_expires_at: '2025-01-14T16:20:00.000Z',
+};
+
 const RoleSchema = Type.Unsafe<(typeof ROLES)[number]>({
   type: 'string',
   enum: [...ROLES],
@@ -54,6 +78,7 @@ export const IdentitySchema = Type.Object(
   },
   {
     $id: 'Identity',
+    examples: [IDENTITY_EXAMPLE],
     title: 'Identity',
     additionalProperties: false,
     description: 'The authenticated caller, as the server currently understands them.',
@@ -83,6 +108,17 @@ export const TokenResponseSchema = Type.Object(
   },
   {
     $id: 'TokenResponse',
+    examples: [
+      {
+        data: {
+          access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.<payload>.<signature>',
+          token_type: 'Bearer',
+          expires_in: 3600,
+          expires_at: '2025-01-14T16:20:00.000Z',
+          principal: IDENTITY_EXAMPLE,
+        },
+      },
+    ],
     title: 'TokenResponse',
     additionalProperties: false,
     description: 'A newly issued development bearer token, with the identity it represents.',
@@ -93,6 +129,7 @@ export const IdentityResponseSchema = Type.Object(
   { data: Type.Unsafe<Static<typeof IdentitySchema>>({ $ref: 'Identity#' }) },
   {
     $id: 'IdentityResponse',
+    examples: [{ data: IDENTITY_EXAMPLE }],
     title: 'IdentityResponse',
     additionalProperties: false,
     description: 'The identity behind the presented token.',

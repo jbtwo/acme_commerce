@@ -59,6 +59,15 @@ export const HealthResponseSchema = Type.Object(
   },
   {
     $id: 'HealthResponse',
+    examples: [
+      {
+        status: 'ok',
+        service: 'acme-commerce',
+        version: '0.3.0',
+        environment: 'production',
+        uptime_seconds: 84021.7,
+      },
+    ],
     title: 'HealthResponse',
     description: 'Liveness. Answered from process state alone; no dependency is contacted.',
     additionalProperties: false,
@@ -90,6 +99,17 @@ export const ReadinessResponseSchema = Type.Object(
   },
   {
     $id: 'ReadinessResponse',
+    examples: [
+      {
+        status: 'ready',
+        checks: {
+          configuration: { status: 'ok', detail: 'Configuration loaded.', duration_ms: 0.1 },
+          database: { status: 'ok', detail: 'SELECT 1 succeeded.', duration_ms: 3.4 },
+          migrations: { status: 'ok', detail: 'All 3 migrations applied.', duration_ms: 2.1 },
+        },
+        checked_at: '2025-01-14T15:20:00.000Z',
+      },
+    ],
     title: 'ReadinessResponse',
     description:
       'Readiness. Returns 200 when the application can serve API traffic and 503 when it ' +
