@@ -21,39 +21,11 @@
  */
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { stringify as stringifyYaml } from 'yaml';
 import { buildApp } from '../app.js';
 import type { Config } from '../config/index.js';
 import { APP_VERSION } from '../version.js';
 
 const OUTPUT_PATH = path.join(process.cwd(), 'openapi', 'openapi.json');
-
-/**
- * The same document, as YAML, at the path Postman's Spec Hub integration reads.
- *
- * Why a second copy instead of pointing Postman at openapi/openapi.json? Because Postman's
- * sync owns the directory it reads from: it has already moved, renamed, and once deleted a
- * file placed under its control. Keeping the authored artifact at openapi/openapi.json and
- * emitting a derived copy here means Postman can churn its own directory freely and the
- * build's contract is never at risk.
- *
- * The copy is GENERATED, never edited. `openapi:check` verifies it alongside the JSON, so a
- * spec that Postman has rewritten from a collection — which is how this file came to hold a
- * 10-operation document when the API has 27 — fails the build instead of silently becoming
- * the contract of record.
- */
-const POSTMAN_SPEC_PATH = path.join(
-  process.cwd(),
-  'postman',
-  'specs',
-  'Acme Commerce API',
-  'Acme Commerce API.yaml',
-);
-
-/** YAML rendering of the snapshot. Line width off; wrapped descriptions diff badly. */
-function toYaml(json: string): string {
-  return stringifyYaml(JSON.parse(json), { lineWidth: 0 });
-}
 
 /**
  * A synthetic configuration for spec generation.
@@ -190,14 +162,11 @@ async function main(): Promise<void> {
   if (!checkOnly) {
     await mkdir(path.dirname(OUTPUT_PATH), { recursive: true });
     await writeFile(OUTPUT_PATH, current, 'utf8');
-    await mkdir(path.dirname(POSTMAN_SPEC_PATH), { recursive: true });
-    await writeFile(POSTMAN_SPEC_PATH, toYaml(current), 'utf8');
     const parsed = JSON.parse(current) as {
       paths?: object;
       components?: { schemas?: object };
     };
     console.log(`Wrote ${path.relative(process.cwd(), OUTPUT_PATH)}`);
-    console.log(`Wrote ${path.relative(process.cwd(), POSTMAN_SPEC_PATH)}`);
     console.log(
       `  ${Object.keys(parsed.paths ?? {}).length} paths, ` +
         `${Object.keys(parsed.components?.schemas ?? {}).length} component schemas`,
@@ -217,30 +186,7 @@ async function main(): Promise<void> {
   }
 
   if (committed === current) {
-    // The JSON is current. The YAML copy Postman reads must match it too — if it does not,
-    // something outside this generator rewrote it.
-    const expectedYaml = toYaml(current);
-    let committedYaml: string;
-    try {
-      committedYaml = await readFile(POSTMAN_SPEC_PATH, 'utf8');
-    } catch {
-      console.error(
-        `\n${path.relative(process.cwd(), POSTMAN_SPEC_PATH)} does not exist.\n` +
-          `Run 'npm run openapi:generate' and commit the result.\n`,
-      );
-      process.exit(1);
-    }
-    if (committedYaml !== expectedYaml) {
-      console.error(
-        `\nSPEC OVERWRITTEN: ${path.relative(process.cwd(), POSTMAN_SPEC_PATH)} is not the\n` +
-          `generated contract. The usual cause is a Postman 'sync collection to spec', which\n` +
-          `derives a spec from the requests in a collection and so drops every operation\n` +
-          `nobody built a request for.\n` +
-          `\nRun 'npm run openapi:generate' to restore it, then push the spec to Postman.\n`,
-      );
-      process.exit(1);
-    }
-    console.log('OpenAPI snapshot is up to date (JSON and Postman YAML).');
+    console.log('OpenAPI snapshot is up to date.');
     return;
   }
 
@@ -254,7 +200,10 @@ async function main(): Promise<void> {
       `  2. If it is, run 'npm run openapi:generate' and commit openapi/openapi.json.\n` +
       `  3. If it is not, fix the route schema instead.\n` +
       `\nIf the change removes or renames a field, or narrows a type, it is a BREAKING change\n` +
-      `for existing consumers even though this check treats every difference the same.\n`,
+      `for existing consumers even though this check treats every difference the same.\n` +
+      `\nIf whole operations have DISAPPEARED, suspect a Postman 'sync collection to spec'.\n` +
+      `That derives a spec from the requests in a collection, so it drops every operation\n` +
+      `nobody built a request for. Regenerate; never accept that direction's output.\n`,
   );
   process.exit(1);
 }
