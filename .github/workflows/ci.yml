@@ -1,7 +1,7 @@
 # The merge gate. Everything here needs a real PostgreSQL, which is why it is separate from
 # release.yml — that workflow deliberately proves only what can be proved without a database.
 #
-#   integration  147 Vitest tests against real PostgreSQL
+#   integration  251 Vitest tests against real PostgreSQL
 #   contract     the hand-built Postman collection, run by the Postman CLI against a live app
 #
 # The second job is the interesting one. The integration tests are written by the people who

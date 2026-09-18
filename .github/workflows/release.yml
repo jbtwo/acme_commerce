@@ -45,13 +45,13 @@ jobs:
   # WHAT THIS PROVES
   #   - The code compiles under strict TypeScript.
   #   - Formatting and lint rules hold.
-  #   - The 114 unit tests pass, including the 34 covering the destructive-operation guard.
+  #   - The 157 unit tests pass, including the 34 covering the destructive-operation guard.
   #   - The committed OpenAPI snapshot matches what the server would actually serve, so no
   #     undocumented contract change can reach a release.
   #   - The contract is structurally valid and passes the governance rules in redocly.yaml.
   #
   # WHAT IT DOES NOT PROVE
-  #   - Anything covered by the 147 integration tests. Those need real PostgreSQL, which needs
+  #   - Anything covered by the 251 integration tests. Those need real PostgreSQL, which needs
   #     a service container, which is Milestone 5. Until then an image can pass this gate and
   #     still have a broken SQL query.
   #   - Anything about behaviour under load, TLS, or a real network.
