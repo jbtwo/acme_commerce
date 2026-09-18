@@ -544,10 +544,10 @@ suite still does not cover.
 
 | Level                | Where                                | Count | Proves                                                                                                            | Does **not** prove               |
 | -------------------- | ------------------------------------ | ----- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------- |
-| **Unit**             | `tests/unit/`                        | 114   | Pure logic: id format, pagination arithmetic, Ajv error translation, config validation, the safety guard          | That anything is wired together  |
+| **Unit**             | `tests/unit/`                        | 157   | Pure logic: id format, pagination arithmetic, Ajv error translation, config validation, the safety guard          | That anything is wired together  |
 | **DB integration**   | `tests/integration/database.test.ts` | 22    | SQL and schema: constraints, triggers, cascade, index existence, seed determinism                                 | Anything about HTTP              |
-| **HTTP integration** | `tests/integration/*.test.ts`        | 100   | Status codes, headers, envelopes, filters, sort stability, every documented error                                 | Anything about the network       |
-| **Contract**         | `tests/integration/contract.test.ts` | 25    | Served spec = committed spec; real responses validate against published schemas; documented examples are accepted | That a `description` is truthful |
+| **HTTP integration** | `tests/integration/*.test.ts`        | 202   | Status codes, headers, envelopes, filters, sort stability, every documented error                                 | Anything about the network       |
+| **Contract**         | `tests/integration/contract.test.ts` | 27    | Served spec = committed spec; real responses validate against published schemas; documented examples are accepted | That a `description` is truthful |
 | **CLI smoke**        | `scripts/smoke.sh`                   | 103   | It works over a real TCP socket, from outside the process                                                         | Behaviour under load             |
 
 ### What each level actually buys you

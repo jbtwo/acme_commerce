@@ -32,9 +32,9 @@ answer.
 | Validation                   | TypeBox → JSON Schema; two Ajv instances; readable field-level errors                                                               |
 | Structured errors            | 12 error codes, one envelope, `request_id` on every response                                                                        |
 | Request correlation          | `X-Request-Id` in and out, validated, on every log line                                                                             |
-| OpenAPI                      | 3.1.0, 7 paths, 14 component schemas, snapshot-committed with a drift check                                                         |
+| OpenAPI                      | 3.1.0, 19 paths, 37 component schemas (every one with a worked example), snapshot-committed with a drift check                      |
 | Logging                      | pino JSON, one line per request with route pattern and duration, credential redaction                                               |
-| Tests                        | 261 automated (114 unit, 147 integration) + 103 command-line smoke assertions                                                       |
+| Tests                        | 408 automated (157 unit, 251 integration) + 146 command-line smoke assertions                                                       |
 | Container                    | Multi-stage `node:26-alpine`, non-root, `HEALTHCHECK`, graceful shutdown                                                            |
 | Documentation                | README, plan, architecture, PostgreSQL setup, Unraid deployment, decisions, workflow, learning guide, personas, Postman conventions |
 
