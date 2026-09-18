@@ -502,3 +502,60 @@ real role model arrives.
 
 **Costs.** This build must not be exposed to an untrusted network. Stated in the OpenAPI
 description, in the README, and in `docs/UNRAID_DEPLOYMENT.md`.
+
+---
+
+## D-023 — One OpenAPI file, pinned to one Postman cloud spec
+
+**Status:** Accepted
+
+**Selected.** `openapi/openapi.json` is the only OpenAPI document in the repository. It is
+pinned in `.postman/resources.yaml` to the cloud spec that already exists:
+
+```yaml
+localResources:
+  specs:
+    - ../openapi/openapi.json
+cloudResources:
+  specs:
+    ../openapi/openapi.json: 08a1cc68-0c46-4909-a49f-55534c2b2683
+```
+
+**Why.** Postman's workspace watcher adopts every OpenAPI file it finds under the connected
+folder, and the connected folder is the repository root. There is no `.postmanignore`;
+`localResources` is additive scoping, not exclusion. So a second copy of the document — however
+carefully placed — does not shield the first from the watcher. It guarantees the same contract
+exists twice, and the watcher creates one cloud spec per file it finds.
+
+That is what produced two specs in Spec Hub, and what deleted `openapi/openapi.json` twice: the
+file was adopted, a cloud spec was created for it, and the file was then moved or removed along
+with that spec's lifecycle. Pinning makes re-adoption idempotent instead of damaging — the
+watcher adding the file to `localResources` is now _correct_, because that file is the one that
+belongs in Spec Hub.
+
+**No spec/collection sync, in either direction.** `.postman/workflows.yaml` does not exist, and
+should not be recreated with entries in it. Postman writes that file when a sync relationship is
+created in the UI, so if it reappears, a sync was added — check which direction:
+
+- `syncCollectionToSpec` (spec ← collection) is **destructive here.** A collection is a subset
+  of a contract by construction: it contains only the operations somebody built a request for.
+  Deriving a spec from one produces a spec of what we _test_, not of what we _built_. This
+  already happened once — it replaced a 3.1 / 0.3.0 / 27-operation contract with a
+  3.0.0 / 1.0.0 / 10-operation document, renaming `bearerAuth` to `BearerAuth` on the way. The
+  spec is generated from the Fastify route schemas, which are the actual source of truth, so
+  nothing may write to it from the collection side.
+- `syncSpecToCollection` (spec → collection) is safe in principle but must never target
+  `postman/collections/Acme Commerce`. That collection is hand-built — folders, chained
+  variables, a self-refreshing token, assertions. A spec sync cannot produce any of that and
+  would add ~18 bare requests alongside it. A spec-driven collection belongs in a separate,
+  clearly generated collection.
+
+**Alternatives.** Emitting a second YAML copy into `postman/specs/` so the build's artifact sat
+outside Postman's directory. Tried, reverted: it was the cause rather than the cure, for the
+reason above. Relocating the artifact _into_ `postman/specs/` instead would have touched some
+fifteen files of prose to move the contract into the one directory Postman actively rewrites.
+
+**Costs.** The file lives where a Postman action can still overwrite it. `npm run openapi:check`
+is the defence: it fails the build on any difference, and its message names a
+"sync collection to spec" as the thing to suspect when whole operations disappear. Recovery is
+`npm run openapi:generate`, since the document is generated from code and never edited by hand.
